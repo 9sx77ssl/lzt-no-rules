@@ -1389,7 +1389,7 @@ function openOnlineModal() {
   );
   if (!users.length) {
     const empty = document.createElement('div');
-    empty.className = 'muted';
+    empty.className = `not-users ${HASH.online}`;
     empty.textContent = 'В комнате пока никого нет';
     block.appendChild(empty);
   } else {
