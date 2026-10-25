@@ -5,7 +5,9 @@
 Userscript отправляет на `wss://lztws.d9v.uk/ws` только:
 
 - временный токен, выданный форумом через
-  `POST /login/generate-temporary-token` (scope `read`);
+  `POST /login/generate-temporary-token` (scope `read` для нашего сервера);
+- отдельный короткоживущий токен scope `basic post` используется **только**
+  локально для `/editor/unfurl` и на сервер не отправляется;
 - собственный session token сервера;
 - общий `ACCESS_KEY` расширения;
 - текст/HTML сообщений, `clientId`, `replyTo`, id редактируемого/удаляемого
@@ -27,7 +29,7 @@ IP-адрес клиента (сервер видит его сам через C
 |---|---|
 | Подделка имени/аватара в DOM | сервер берёт identity из проверенного токена, а не из клиентских полей |
 | Кража session token | в БД только SHA-256, токен opaque, TTL 30 дней, отзыв через удаление сессии |
-| Перебор/спам | `ACCESS_KEY`, rate limit по user id и IP, auth timeout, duplicate guard |
+| Перебор/спам | `ACCESS_KEY`, rate limit по user id и IP, auth timeout, дедупликация по clientId |
 | XSS в сообщениях | серверный `sanitize-html` + клиентский sanitizer, белый список тегов/атрибутов/классов/стилей |
 | Подмена картинок/трекеров | разрешены только `nztcdn.com` и форумные хосты, внешние картинки по умолчанию выключены |
 | Огромные сообщения/флуд кадрами | лимиты HTML/текста/байтов, `maxPayload` у WS, rate limit |
@@ -69,12 +71,27 @@ cookies и `_xfToken` в него не попадают.
   `font-weight`, `font-style`, `text-decoration`, `text-shadow` с лимитами;
 - удаляются `script`, `style`, `iframe`, `object`, `embed`, обработчики
   событий, `javascript:`/`data:` URL;
-- стили ников: сохраняются градиенты и `text-shadow`, inline SVG-иконки
-  вырезаются (они ломают нативный вид и могут содержать лишнее);
+- стили ников: сохраняются градиенты и `text-shadow`; username SVG
+  (`uniqUsernameIcon--custom`) проходит отдельный allowlist тегов/атрибутов,
+  `script/style/foreignObject/use/image` удаляются;
 - лимиты: 4 изображения, 5 ссылок, 8 упоминаний, 30 переводов строк.
 
 Клиент повторно санитайзит HTML перед вставкой, чтобы не доверять даже
 собственному серверу при компрометации.
+
+### 4.1. BBCode, market и медиа
+
+- BBCode разбирается в DOM, а не через `innerHTML` пользовательской строки:
+  `[IMG]`/`[MEDIA]`/`[URL]` создают безопасные элементы, затем HTML всё равно
+  проходит `sanitizeClientHtml` и серверный sanitize.
+- Market-карточка (`unfurlContainer`, `marketItem`, `categoryIcon`,
+  `price`, `Value`) содержит только текст/класс/`data-*`; никаких
+  inline-скриптов.
+- Метаданные `/editor/unfurl` получаются клиентом с форумным Bearer
+  `basic post`; этот токен не отправляется на наш сервер.
+- Fancybox/lightbox — нативный XenForo, мы только добавляем `a.LbTrigger`
+  с `data-href`/`data-fancybox`; URL проверяется как https.
+- Видео/аудио источники проходят `isAllowedMediaUrl` (https + allowlist).
 
 ## 5. Rate limit и антиспам
 

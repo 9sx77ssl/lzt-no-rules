@@ -1,4 +1,12 @@
-# Архитектура расширения
+# Архитектура
+
+Полная документация разделена на несколько файлов:
+
+- [EXTENSION.md](EXTENSION.md) — userscript: модули, state, рендер, видео,
+  lightbox, смайлы, BBCode;
+- [BACKEND.md](BACKEND.md) — Bun/Node server, БД, auth, rate limits;
+- [NATIVE-CHATBOX.md](NATIVE-CHATBOX.md) — реверс форума;
+- [BBCode.md](BBCode.md) — BBCode и copy.
 
 ## 1. Модули
 
@@ -91,7 +99,7 @@ Reply хранит `reply_html` (полный санитайзенный HTML ц
 изображения, embeds, unfurl и mentions сохраняются. Reply-бар при вводе также
 показывает rich HTML (с ограничением высоты/скроллом).
 
-## 5.1. Embeds и копирование
+## 5.1. Embeds, market и BBCode
 
 Tiptap при вставке ссылки создаёт нативные Svelte-ноды `.unfurl-renderer`
 (Telegram/Steam/Market, форум) или `.embed-link` (SoundCloud/YouTube/TikTok).
@@ -99,9 +107,29 @@ Tiptap при вставке ссылки создаёт нативные Svelte
 рисует карточки 1:1. Для обычного текста с URL клиент делает linkify, чтобы
 ссылка была кликабельной даже в старых сообщениях.
 
-`htmlToBbcode()` повторяет `messageRaw`: `[unfurl="..."]`, `[UNFURL="..."]`,
-`[MEDIA=soundcloud|youtube|tiktok]`, `[URL=...]`, `[IMG]...[/IMG]`, smilies
-`:name:`. Никаких тостов после копирования нет — только `console.debug`.
+Если Tiptap не успел собрать карточку, `resolvePlainUnfurls` вызывает
+`POST https://api.lolz.team/editor/unfurl` с Bearer-токеном `basic post`:
+
+- `type=node` → `.unfurl-renderer` + `.forum-wrapper`;
+- `type=media` → `.embed-link`;
+- `type=market_item` → legacy `.unfurlContainer.marketItem` с
+  `categoryIcon`, `.title`, `.price > .Value`, `.LinkClicker`.
+
+BBCode (`[UNFURL]`, `[IMG]`, `[MEDIA]`, `[URL]`, `[B]`, ...) разбирается
+`resolveBbcode` до отправки и при рендере старых сообщений. Копирование
+`htmlToBbcode()` возвращает BBCode, включая market-аккаунт.
+
+## 5.2. Фото, смайлы, видео
+
+- `prepareLightboxImages` оборачивает bare `<img>` в `a.LbTrigger` с
+  `data-fancybox=gallery`; клик открывает нативный fancybox.
+- `applySingleSmilie` повторяет нативную проверку: ровно один `.mceSmilie` и
+  нет другого значимого содержимого → `mceSmilieLarge` 96×96.
+- `activateNativeContent` вызывает `XenForo.activate` только для ещё не
+  смонтированных `<video>`; нативный плеер живёт в `.aspect.lztng-tn70wf`.
+- `renderMessages` переиспользует DOM сообщений по `messageRenderKey`, чтобы
+  видео не перезагружалось и не появлялся спиннер при новых сообщениях.
+- В редакторе видео muted autoplay; в reply-баре — HTML5 controls.
 
 ## 6. Typing
 
@@ -134,7 +162,9 @@ No Rules; нативная комната не затрагивается.
 
 ## 9. Тесты
 
-Playwright-сценарии лежат вне репозитория и запускаются против production
-WSS. Проверяются full chat, widget, mobile, Firefox, hash/reload,
-offline outbox, история > 60, меню, reply/edit/delete и online-модалка.
-Подробности — [TESTING.md](TESTING.md).
+Playwright-сценарии запускаются против production WSS и тестового
+storageState. Проверяются full chat, widget, mobile, Firefox,
+hash/reload, offline outbox, история > 60, меню, reply/edit/delete,
+online-модалка, видео (плеер/F5/новые сообщения), lightbox, smilie,
+BBCode/market/accounts, ArrowUp edit last и copy. Полный чек-лист —
+[TESTING.md](TESTING.md).

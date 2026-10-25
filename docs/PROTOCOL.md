@@ -1,6 +1,6 @@
 # Протокол No Rules
 
-Версия протокола: **1**. Транспорт — WebSocket, текстовые кадры JSON.
+Версия протокола: **1** (клиент 1.1.16, сервер 1.1.16). Транспорт — WebSocket, текстовые кадры JSON.
 Сервер: `wss://lztws.d9v.uk/ws`.
 
 ## 1. Подключение
@@ -8,7 +8,7 @@
 1. Клиент открывает WebSocket.
 2. Сервер присылает `hello`:
    ```json
-   {"type":"hello","protocol":1,"version":"1.0.1","roomTitle":"No Rules","serverTime":1792946496011}
+   {"type":"hello","protocol":1,"version":"1.1.16","roomTitle":"No Rules","serverTime":1792946496011}
    ```
 3. Клиент отправляет `auth` (первый вход) или `resume` (есть сессия).
 
@@ -19,7 +19,7 @@
   "type": "auth",
   "token": "<временный токен форума>",
   "accessKey": "<общий ключ расширения>",
-  "clientVersion": "1.0.1"
+  "clientVersion": "1.1.16"
 }
 ```
 
@@ -46,7 +46,7 @@
 ### resume
 
 ```json
-{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.0.1"}
+{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.1.16"}
 ```
 
 Ответ такой же `auth.ok`; поле `resumed` есть только в логах сервера.

@@ -395,6 +395,8 @@ function renderReplyBar() {
     applyMentionHighlights(text);
     hydrateForumTitles(text);
     hydrateMarketCards(text);
+    prepareLightboxImages(text);
+    applySingleSmilie(text);
     prepareReplyVideos(text);
   } else {
     const paragraph = document.createElement('p');

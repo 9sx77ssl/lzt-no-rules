@@ -77,6 +77,15 @@ const NR_CSS = `
 }
 
 
+#no-rules-messages .chat2-message-text .mceSmilie.mceSmilieLarge {
+  width: 96px !important;
+  height: 96px !important;
+  max-width: 96px !important;
+  max-height: 96px !important;
+}
+#no-rules-messages .chat2-message-text-inner > p > a.LbTrigger { display: block; }
+#no-rules-messages .chat2-message-text-inner > p > a.LbTrigger img { max-height: 10vh; width: auto; }
+
 /* Native video messages need the same text/date layout before and after the
    XenForo video player is mounted, otherwise the message jumps horizontally. */
 #no-rules-messages .chat2-message-text:has(video) {
@@ -1370,6 +1379,39 @@ function hydrateMarketCards(root) {
   }
 }
 
+function prepareLightboxImages(root) {
+  if (!root) return;
+  for (const image of root.querySelectorAll('img')) {
+    if (image.closest('a, .mention, .avatar, .mceSmilie, .unfurlContainer, .embed-link, [data-lzt-video-player]')) continue;
+    const src = image.getAttribute('src') || '';
+    if (!/^https?:\/\//i.test(src)) continue;
+    const link = document.createElement('a');
+    link.className = 'LbTrigger';
+    link.href = src;
+    link.setAttribute('data-href', 'https://lolz.team/misc/lightbox');
+    link.setAttribute('data-fancybox', 'gallery');
+    image.parentNode?.insertBefore(link, image);
+    link.appendChild(image);
+  }
+}
+
+function applySingleSmilie(root) {
+  const smilies = root.querySelectorAll('.mceSmilie');
+  if (smilies.length !== 1) return;
+  const onlySmilie = (node) => {
+    const meaningful = [...node.childNodes].filter(
+      (child) =>
+        child.nodeType !== Node.COMMENT_NODE &&
+        !(child.nodeType === Node.TEXT_NODE && !String(child.textContent || '').trim()),
+    );
+    if (meaningful.length !== 1) return false;
+    const child = meaningful[0];
+    if (child.nodeType === Node.ELEMENT_NODE && child.classList.contains('mceSmilie')) return true;
+    return child.nodeName === 'P' && onlySmilie(child);
+  };
+  if (onlySmilie(root)) smilies[0].classList.add('mceSmilieLarge');
+}
+
 function createMessageElement(message, { showHeader = true } = {}) {
   const wrapper = document.createElement('div');
   wrapper.dataset.messageId = String(message.id);
@@ -1430,6 +1472,8 @@ function createMessageElement(message, { showHeader = true } = {}) {
       applyMentionHighlights(text);
       hydrateForumTitles(text);
       hydrateMarketCards(text);
+      prepareLightboxImages(text);
+      applySingleSmilie(text);
       prepareReplyVideos(text);
     } else {
       const paragraph = document.createElement('p');
@@ -1458,6 +1502,8 @@ function createMessageElement(message, { showHeader = true } = {}) {
       applyMentionHighlights(inner);
       hydrateForumTitles(inner);
       hydrateMarketCards(inner);
+      prepareLightboxImages(inner);
+      applySingleSmilie(inner);
     } else {
       inner.textContent = message.text || '';
     }

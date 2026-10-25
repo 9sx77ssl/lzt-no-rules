@@ -10,12 +10,12 @@ bun test
 ```
 
 `bun test` запускает 20 unit-тестов: auth, antibot, db, rate limit,
-sanitize.
+sanitize. Playwright-сценарии лежат вне репозитория из-за storageState.
 
 ## 2. Сборка
 
 ```bash
-NR_VERSION=1.0.1 \
+NR_VERSION=1.1.16 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -200,3 +200,51 @@ DELETE FROM messages WHERE client_id LIKE 'seed-history-%';
 - [ ] `https://lztws.d9v.uk/health` и `/version`.
 - [ ] Нет секретов в `git status`/`git diff`.
 - [ ] Raw userscript на GitHub совпадает по SHA-256 с локальным.
+
+## 12. Feature checklist (2026-10)
+
+### Room / lifecycle
+
+- [ ] Прямой `#no-rules`, F5, возврат в native room.
+- [ ] Full chat и floating widget.
+- [ ] History > page size, scroll position, unread/paused.
+- [ ] Offline outbox и reconnect.
+
+### Messages
+
+- [ ] Send / edit / delete / reply.
+- [ ] Два одинаковых сообщения подряд оба остаются.
+- [ ] Plain `@nick` → native mention; unknown nick остаётся текстом.
+- [ ] `ArrowUp` в пустом composer → edit последнего своего сообщения.
+- [ ] Reply сохраняет HTML (image/video/embed/unfurl/mention) после F5.
+
+### Native integrations
+
+- [ ] Bare photo upload → `a.LbTrigger` → click opens native fancybox.
+- [ ] `[IMG]...[/IMG]` → image + fancybox.
+- [ ] Single `.mceSmilie` → `mceSmilieLarge` 96×96; two smilies remain small.
+- [ ] Video upload → native player; play/pause/fullscreen; F5.
+- [ ] Send text messages while video is playing: player node same,
+      `currentTime` continues, no spinner, x/width stable.
+- [ ] Reply to video: reply bar has `<video controls poster>`.
+- [ ] Plain YouTube/SoundCloud link → `.embed-link`.
+- [ ] Plain forum link → native unfurl.
+- [ ] `https://lzt.market/266223421/` → account block with icon/title/price.
+- [ ] `[UNFURL="..."]...[/UNFURL]` → same block.
+- [ ] `[MEDIA=youtube]...[/MEDIA]` → correct embed (not malformed link).
+- [ ] `[B]/[I]/[URL=...]` render and copy as BBCode.
+
+### Safety / polish
+
+- [ ] No `pageerror`.
+- [ ] No horizontal scroll on mobile.
+- [ ] No duplicate `#no-rules-messages`, no duplicate No Rules links/scripts.
+- [ ] `#no-rules-messages` hidden/removed when native room active.
+- [ ] `XenForo.activate` not called on already mounted video player.
+
+### Cleanup after manual test
+
+- [ ] Delete test messages in No Rules.
+- [ ] Delete test messages in native English chat.
+- [ ] Clear draft video/image in composer.
+- [ ] Verify production DB has no active test markers.
