@@ -66,6 +66,9 @@ WebSocket-бэкенд к ней. Комната выглядит и ведёт 
 
 - Userscript не доверяет имени пользователя из DOM. Он получает временный
   токен через `/login/generate-temporary-token` и передаёт его серверу.
+- Прод запущен через **systemd** (`no-rules.service`, Bun), не в Docker.
+  Dockerfile/compose в `deploy/` — опциональная альтернатива, в проде не
+  используются.
 - Сервер проверяет токен через `https://api.lolz.team/users/:id`, после чего
   выдаёт собственный opaque session token. В БД хранится только SHA-256 от
   него.
