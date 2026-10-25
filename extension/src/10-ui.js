@@ -73,6 +73,24 @@ const NR_CSS = `
 #no-rules-messages .nr-highlight .chat2-message-block { box-shadow: 0 0 0 2px var(--primaryMedium, #2f8a5d); transition: box-shadow .2s ease; }
 #no-rules-messages .nr-swipe { transform: translateX(8px); transition: transform .12s ease; }
 
+#no-rules-reply .chat2-replying-text {
+  display: block;
+  max-height: 140px;
+  overflow: auto;
+  min-width: 0;
+}
+#no-rules-reply .chat2-replying-text img {
+  max-height: 80px;
+  width: auto;
+  max-width: 100%;
+}
+#no-rules-reply .chat2-replying-text .unfurlContainer,
+#no-rules-reply .chat2-replying-text .unfurl-renderer,
+#no-rules-reply .chat2-replying-text .embed-link,
+#no-rules-reply .chat2-replying-text .internalNodeLink {
+  max-width: 100%;
+}
+
 .nr-room-unread {
   display: inline-flex;
   align-items: center;
@@ -909,6 +927,13 @@ function forumCardFor(href) {
   return card;
 }
 
+function applyMentionHighlights(root) {
+  for (const mention of root.querySelectorAll('a.mention')) {
+    const userId = Number(String(mention.dataset.user || '').split(',')[0]);
+    mention.classList.toggle('highlight', Boolean(state.user?.id) && userId === state.user.id);
+  }
+}
+
 function enhanceUnfurls(html) {
   const template = document.createElement('template');
   template.innerHTML = linkifyHtml(sanitizeClientHtml(html));
@@ -1007,9 +1032,17 @@ function createMessageElement(message, { showHeader = true } = {}) {
     label.innerHTML = replyUsernameHtml;
     const text = document.createElement('span');
     text.className = `chat2-reply-text ${HASH.message}`;
-    const paragraph = document.createElement('p');
-    paragraph.textContent = message.reply.text || '[сообщение]';
-    text.appendChild(paragraph);
+    if (state.deletedIds.has(Number(message.reply.id)) || message.reply.deleted) {
+      text.textContent = 'Сообщение удалено';
+    } else if (message.reply.html) {
+      text.innerHTML = enhanceUnfurls(message.reply.html);
+      applyMentionHighlights(text);
+      hydrateForumTitles(text);
+    } else {
+      const paragraph = document.createElement('p');
+      paragraph.textContent = message.reply.text || '[сообщение]';
+      text.appendChild(paragraph);
+    }
     reply.appendChild(label);
     reply.appendChild(document.createTextNode(' '));
     reply.appendChild(text);
@@ -1029,10 +1062,7 @@ function createMessageElement(message, { showHeader = true } = {}) {
     const html = enhanceUnfurls(message.html || '');
     if (html) {
       inner.innerHTML = html;
-      for (const mention of inner.querySelectorAll('a.mention')) {
-        const userId = Number(String(mention.dataset.user || '').split(',')[0]);
-        mention.classList.toggle('highlight', Boolean(state.user?.id) && userId === state.user.id);
-      }
+      applyMentionHighlights(inner);
       hydrateForumTitles(inner);
     } else {
       inner.textContent = message.text || '';

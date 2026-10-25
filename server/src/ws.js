@@ -223,6 +223,7 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
         color: target.user.color || null,
       },
       text: truncate(target.text || '[вложение]', 280),
+      html: truncate(target.html || '', 12_000),
     };
   }
 

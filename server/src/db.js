@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS messages (
   reply_username_html TEXT,
   reply_color TEXT,
   reply_text TEXT,
+  reply_html TEXT,
   client_id TEXT,
   created_at INTEGER NOT NULL,
   edited_at INTEGER,
@@ -106,7 +107,7 @@ export function rowToMessage(row) {
             color: row.reply_color || null,
           },
           text: row.reply_text || '',
-          html: '',
+          html: row.reply_html || '',
         }
       : null,
     meta: parseMeta(row.meta),
@@ -159,6 +160,9 @@ export function openDatabase({ path, logger }) {
   if (!messageColumns.has('reply_color')) {
     db.exec('ALTER TABLE messages ADD COLUMN reply_color TEXT');
   }
+  if (!messageColumns.has('reply_html')) {
+    db.exec('ALTER TABLE messages ADD COLUMN reply_html TEXT');
+  }
   const userColumns = new Set(
     db
       .prepare('PRAGMA table_info(users)')
@@ -171,8 +175,8 @@ export function openDatabase({ path, logger }) {
   if (!userColumns.has('stats_updated_at')) {
     db.exec('ALTER TABLE users ADD COLUMN stats_updated_at INTEGER');
   }
-  if (version <= 3) db.exec('PRAGMA user_version = 4');
-  else if (version > 4) {
+  if (version <= 4) db.exec('PRAGMA user_version = 5');
+  else if (version > 5) {
     throw new Error(`Unsupported database schema version ${version}`);
   }
 
@@ -243,11 +247,11 @@ export function openDatabase({ path, logger }) {
     insertMessage: prepare(`
       INSERT INTO messages (
         user_id, username, username_html, avatar_url, color, html, text,
-        reply_to, reply_user_id, reply_username, reply_username_html, reply_color, reply_text,
+        reply_to, reply_user_id, reply_username, reply_username_html, reply_color, reply_text, reply_html,
         client_id, created_at, meta
       ) VALUES (
         @user_id, @username, @username_html, @avatar_url, @color, @html, @text,
-        @reply_to, @reply_user_id, @reply_username, @reply_username_html, @reply_color, @reply_text,
+        @reply_to, @reply_user_id, @reply_username, @reply_username_html, @reply_color, @reply_text, @reply_html,
         @client_id, @created_at, @meta
       )
     `),
@@ -355,6 +359,7 @@ export function openDatabase({ path, logger }) {
       reply_username_html: message.reply?.user?.usernameHtml ?? null,
       reply_color: message.reply?.user?.color ?? null,
       reply_text: message.reply?.text ?? null,
+      reply_html: message.reply?.html ?? null,
       client_id: message.clientId ?? null,
       created_at: message.createdAt ?? Date.now(),
       meta: message.meta ? JSON.stringify(message.meta) : null,

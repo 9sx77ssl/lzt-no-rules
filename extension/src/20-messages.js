@@ -351,6 +351,7 @@ function startReply(message) {
     id: message.id,
     user: message.user,
     text: message.text || extractTextFromHtml(message.html) || '[вложение]',
+    html: message.html || '',
   };
   renderReplyBar();
   getTiptap()?.commands.focus();
@@ -388,9 +389,15 @@ function renderReplyBar() {
   author.innerHTML = `Ответ ${authorHtml}`;
   const text = document.createElement('span');
   text.className = `chat2-replying-text ${HASH.footer}`;
-  const paragraph = document.createElement('p');
-  paragraph.textContent = state.replyTo.text || '[вложение]';
-  text.appendChild(paragraph);
+  if (state.replyTo.html) {
+    text.innerHTML = enhanceUnfurls(state.replyTo.html);
+    applyMentionHighlights(text);
+    hydrateForumTitles(text);
+  } else {
+    const paragraph = document.createElement('p');
+    paragraph.textContent = state.replyTo.text || '[вложение]';
+    text.appendChild(paragraph);
+  }
   container.appendChild(author);
   container.appendChild(text);
   bar.appendChild(container);
@@ -595,6 +602,7 @@ async function sendCurrentMessage() {
         id: state.replyTo.id,
         user: state.replyTo.user,
         text: state.replyTo.text,
+        html: state.replyTo.html || '',
       }
     : null;
   const payload = {
