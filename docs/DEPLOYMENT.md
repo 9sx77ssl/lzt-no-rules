@@ -162,22 +162,7 @@ journalctl -u no-rules -n 50 --no-pager
 Userscript обновляется отдельно: пересобрать локально, закоммитить
 `extension/dist/no-rules.user.js`; Tampermonkey подхватит `@updateURL`.
 
-## 8. Docker (опционально)
-
-```bash
-cp /opt/no-rules/app/.env.example /opt/no-rules/.env   # заполнить
-docker compose -f /opt/no-rules/app/deploy/docker-compose.yml up -d --build
-```
-
-Контейнер слушает `127.0.0.1:8787`, БД — volume `../data`. nginx остаётся
-снаружи. Для обновления:
-
-```bash
-git -C /opt/no-rules/app pull --ff-only
-docker compose -f /opt/no-rules/app/deploy/docker-compose.yml up -d --build
-```
-
-## 9. Бэкапы и обслуживание
+## 8. Бэкапы и обслуживание
 
 ```bash
 mkdir -p /opt/no-rules/backups
@@ -194,7 +179,7 @@ sqlite3 /opt/no-rules/data/no-rules.db \
 - Проверить, что порт 8787 не слушает `0.0.0.0`:
   `ss -ltnp | grep 8787`.
 
-## 10. Чек-лист после деплоя
+## 9. Чек-лист после деплоя
 
 - [ ] `systemctl is-active no-rules` → `active`.
 - [ ] `curl https://lztws.d9v.uk/health` → `ok:true`.
