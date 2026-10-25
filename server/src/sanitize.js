@@ -117,16 +117,151 @@ function colorFromStyle(style) {
   return match ? normalizeColor(match[1]) : null;
 }
 
+const USERNAME_SVG_TAGS = [
+  'svg',
+  'g',
+  'path',
+  'circle',
+  'ellipse',
+  'rect',
+  'line',
+  'polyline',
+  'polygon',
+  'defs',
+  'linearGradient',
+  'radialGradient',
+  'stop',
+  'clipPath',
+  'title',
+  'desc',
+  'metadata',
+  'animate',
+  'animateTransform',
+];
+
+const USERNAME_SVG_ATTRIBUTES = {
+  svg: [
+    'viewBox',
+    'width',
+    'height',
+    'fill',
+    'stroke',
+    'stroke-width',
+    'stroke-linecap',
+    'stroke-linejoin',
+    'preserveAspectRatio',
+    'xmlns',
+    'role',
+  ],
+  g: ['fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'transform', 'opacity'],
+  path: [
+    'd',
+    'fill',
+    'stroke',
+    'stroke-width',
+    'stroke-linecap',
+    'stroke-linejoin',
+    'fill-rule',
+    'clip-rule',
+    'transform',
+    'opacity',
+  ],
+  circle: ['cx', 'cy', 'r', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'opacity'],
+  ellipse: ['cx', 'cy', 'rx', 'ry', 'fill', 'stroke', 'stroke-width', 'opacity'],
+  rect: ['x', 'y', 'width', 'height', 'rx', 'ry', 'fill', 'stroke', 'stroke-width', 'opacity'],
+  line: ['x1', 'y1', 'x2', 'y2', 'stroke', 'stroke-width', 'stroke-linecap', 'opacity'],
+  polyline: ['points', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'opacity'],
+  polygon: ['points', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'opacity'],
+  defs: [],
+  linearGradient: ['x1', 'y1', 'x2', 'y2', 'gradientUnits'],
+  radialGradient: ['cx', 'cy', 'r', 'fx', 'fy', 'gradientUnits'],
+  stop: ['offset', 'stop-color', 'stop-opacity'],
+  clipPath: ['clipPathUnits'],
+  title: [],
+  desc: [],
+  metadata: [],
+  animate: [
+    'attributeName',
+    'values',
+    'from',
+    'to',
+    'by',
+    'dur',
+    'begin',
+    'repeatCount',
+    'keySplines',
+    'calcMode',
+    'type',
+    'fill',
+  ],
+  animateTransform: [
+    'attributeName',
+    'type',
+    'values',
+    'from',
+    'to',
+    'by',
+    'dur',
+    'begin',
+    'repeatCount',
+    'keySplines',
+    'calcMode',
+  ],
+};
+
+const SAFE_ANIMATED_ATTRIBUTES = new Set([
+  'transform',
+  'stroke',
+  'fill',
+  'opacity',
+  'r',
+  'stroke-width',
+  'stroke-dasharray',
+  'd',
+  'cx',
+  'cy',
+  'x',
+  'y',
+  'x1',
+  'y1',
+  'x2',
+  'y2',
+  'offset',
+  'stop-color',
+  'stop-opacity',
+]);
+
+function sanitizeUsernameIcon(svgHtml) {
+  if (!svgHtml) return '';
+  let clean = sanitizeHtml(String(svgHtml).slice(0, 6_000), {
+    allowedTags: USERNAME_SVG_TAGS,
+    allowedAttributes: USERNAME_SVG_ATTRIBUTES,
+    parser: { lowerCaseAttributeNames: false, lowerCaseTags: false },
+    disallowedTagsMode: 'discard',
+  });
+  if (!/^<svg[\s>]/i.test(clean.trim())) return '';
+  const $ = cheerio.load(clean, null, false);
+  $('animate, animateTransform').each((_, element) => {
+    const name = $(element).attr('attributeName');
+    if (!SAFE_ANIMATED_ATTRIBUTES.has(String(name || ''))) $(element).remove();
+  });
+  $('script, style, foreignObject, use, image').remove();
+  clean = $.html();
+  return clean.length <= 6_000 ? clean : '';
+}
+
 /**
- * Extract a safe, minimal username representation from the forum API's
- * username_html. We intentionally do not keep user-provided SVG icons here:
- * the colour is the important identity hint, and dropping inline SVG removes a
- * whole class of markup injection risks.
+ * Extract a safe username representation from the forum API's username_html,
+ * keeping the native colour/gradient and the small custom SVG badge that the
+ * forum renders next to the nickname. SVG is restricted to static geometry and
+ * a small allowlist of safe animated attributes; scripts, styles, external
+ * references and event handlers are impossible.
  */
 export function extractUsernameMeta(usernameHtml, fallbackUsername = '') {
   const raw = typeof usernameHtml === 'string' ? usernameHtml : '';
   let username = String(fallbackUsername || '').trim();
   let style = '';
+  let iconHtml = '';
 
   if (raw) {
     const $ = cheerio.load(raw, null, false);
@@ -139,19 +274,103 @@ export function extractUsernameMeta(usernameHtml, fallbackUsername = '') {
       const text = $.root().text().trim();
       if (text) username = text;
     }
+    const icon = $('.uniqUsernameIcon--custom').first();
+    if (icon.length) {
+      const svg = icon.find('svg').first();
+      if (svg.length) {
+        const safeSvg = sanitizeUsernameIcon($.html(svg));
+        if (safeSvg) {
+          iconHtml = `<span class="uniqUsernameIcon--custom">${safeSvg}</span>`;
+        }
+      }
+    }
   }
 
   if (!username) username = 'unknown';
   username = username.slice(0, 64);
   const color = colorFromStyle(style);
+  const nickHtml = style
+    ? `<span class="styleUserNickname" style="${escapeHtml(style)}">${escapeHtml(username)}</span>`
+    : `<span class="styleUserNickname">${escapeHtml(username)}</span>`;
   return {
     username,
     color,
     usernameStyle: style,
-    usernameHtml: style
-      ? `<span class="styleUserNickname" style="${escapeHtml(style)}">${escapeHtml(username)}</span>`
-      : `<span class="styleUserNickname">${escapeHtml(username)}</span>`,
+    usernameHtml: `${nickHtml}${iconHtml}`,
   };
+}
+
+const SAFE_MESSAGE_CLASSES = new Set([
+  'mceSmilie',
+  'mceSmilieLarge',
+  'big',
+  'bbCodeImage',
+  'LbImage',
+  'avatar',
+  'LbTrigger',
+  'internalLink',
+  'externalLink',
+  'ProxyLink',
+  'internalNodeLink',
+  'internalLinkClicker',
+  'LinkClicker',
+  'short',
+  'unfurlContainer',
+  'shorted',
+  'marketItem',
+  'text',
+  'telegram',
+  'steam',
+  'discord',
+  'market',
+  'vkontakte',
+  'vk',
+  'youtube',
+  'tiktok',
+  'instagram',
+  'twitter',
+  'github',
+  'twitch',
+  'spotify',
+  'soundcloud',
+  'apple',
+  'google',
+  'epicgames',
+  'riot',
+  'minecraft',
+  'valorant',
+  'fortnite',
+  'SvgIcon',
+  'categoryIcon',
+  'title',
+  'videoContainer',
+  'videoWrapper',
+  'spoiler',
+  'bbCodeSpoiler',
+  'Tooltip',
+  'KWMOver',
+  'styleUserNickname',
+  'username',
+  'mention',
+  'notranslate',
+  'userBanner',
+  'nodeInfo',
+]);
+
+const SAFE_MESSAGE_CLASS_RE = /^(?:node\d+|category--[a-z0-9_-]+|Av\d+s|lztng-[a-z0-9-]+|fa[a-z0-9-]*)$/i;
+
+function sanitizeMessageClasses(html) {
+  const $ = cheerio.load(String(html ?? ''), null, false);
+  $('*').each((_, element) => {
+    const raw = $(element).attr('class');
+    if (!raw) return;
+    const safe = raw
+      .split(/\s+/)
+      .filter((value) => SAFE_MESSAGE_CLASSES.has(value) || SAFE_MESSAGE_CLASS_RE.test(value));
+    if (safe.length) $(element).attr('class', safe.join(' '));
+    else $(element).removeAttr('class');
+  });
+  return $.html();
 }
 
 export function createSanitizer(options = {}) {
@@ -192,7 +411,21 @@ export function createSanitizer(options = {}) {
   ];
 
   const allowedAttributes = {
-    a: ['href', 'class', 'title', 'target', 'rel', 'style', 'data-user', 'contenteditable', 'translate'],
+    a: [
+      'href',
+      'class',
+      'title',
+      'target',
+      'rel',
+      'style',
+      'data-user',
+      'data-user-id',
+      'data-href',
+      'data-proxy-href',
+      'data-fancybox',
+      'contenteditable',
+      'translate',
+    ],
     img: [
       'src',
       'alt',
@@ -204,21 +437,12 @@ export function createSanitizer(options = {}) {
       'data-url',
       'data-fallback-src',
     ],
-    abbr: ['title', 'class', 'data-tippy-content'],
-    span: ['class', 'style', 'data-user'],
+    abbr: ['title', 'class', 'data-tippy-content', 'data-cachedtitle'],
+    span: ['class', 'style', 'data-user', 'data-cachedtitle', 'data-url'],
     p: ['class'],
-    div: ['class'],
+    div: ['class', 'data-href'],
     video: ['src', 'poster', 'controls', 'preload', 'class', 'width', 'height', 'muted', 'loop', 'playsinline'],
     source: ['src', 'type'],
-  };
-
-  const allowedClasses = {
-    a: ['notranslate', 'username', 'mention', 'internalLink', 'externalLink', 'LbTrigger', 'Tooltip'],
-    img: ['mceSmilie', 'mceSmilieLarge', 'big', 'bbCodeImage', 'LbImage', 'avatar'],
-    span: ['styleUserNickname', 'username', 'mention'],
-    abbr: ['Tooltip'],
-    div: ['bbCodeSpoiler', 'spoiler', 'unfurlContainer', 'videoContainer'],
-    video: ['videoContainer', 'videoWrapper'],
   };
 
   const allowedStyles = {
@@ -249,6 +473,7 @@ export function createSanitizer(options = {}) {
     if (typeof rawHtml !== 'string') {
       throw new MessageError('invalid', 'Сообщение имеет неверный формат');
     }
+    rawHtml = sanitizeMessageClasses(rawHtml);
     if (rawHtml.length > maxHtml * 2) {
       throw new MessageError('too_long', 'Сообщение слишком длинное');
     }
@@ -256,7 +481,6 @@ export function createSanitizer(options = {}) {
     const sanitized = sanitizeHtml(rawHtml, {
       allowedTags,
       allowedAttributes,
-      allowedClasses,
       allowedStyles,
       allowedSchemes: ['http', 'https', 'mailto'],
       allowedSchemesByTag: {

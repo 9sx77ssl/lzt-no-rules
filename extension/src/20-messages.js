@@ -384,7 +384,7 @@ function renderReplyBar() {
   author.className = `chat2-replying-author ${HASH.footer}`;
   let authorHtml = state.replyTo.user?.usernameHtml ||
     `<span class="styleUserNickname">${escapeHtml(state.replyTo.user?.username || 'unknown')}</span>`;
-  authorHtml = sanitizeClientHtml(authorHtml);
+  authorHtml = sanitizeUsernameHtml(authorHtml);
   author.innerHTML = `Ответ ${authorHtml}`;
   const text = document.createElement('span');
   text.className = `chat2-replying-text ${HASH.footer}`;

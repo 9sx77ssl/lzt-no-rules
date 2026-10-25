@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   username_html TEXT,
   avatar_url TEXT,
   color TEXT,
+  stats TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   last_seen_at INTEGER
@@ -120,6 +121,13 @@ export function rowToUser(row) {
     avatar: row.avatar_url || null,
     color: row.color || null,
     profileUrl: `https://lolz.team/members/${row.user_id}/`,
+    stats: parseMeta(row.stats) || {
+      likes: 0,
+      likes2: 0,
+      messages: 0,
+      trophies: 0,
+      contests: 0,
+    },
     createdAt: row.created_at,
     lastSeenAt: row.last_seen_at || null,
   };
@@ -149,8 +157,17 @@ export function openDatabase({ path, logger }) {
   if (!messageColumns.has('reply_color')) {
     db.exec('ALTER TABLE messages ADD COLUMN reply_color TEXT');
   }
-  if (version === 0 || version === 1) db.exec('PRAGMA user_version = 2');
-  else if (version > 2) {
+  const userColumns = new Set(
+    db
+      .prepare('PRAGMA table_info(users)')
+      .all()
+      .map((column) => column.name),
+  );
+  if (!userColumns.has('stats')) {
+    db.exec('ALTER TABLE users ADD COLUMN stats TEXT');
+  }
+  if (version <= 2) db.exec('PRAGMA user_version = 3');
+  else if (version > 3) {
     throw new Error(`Unsupported database schema version ${version}`);
   }
 
@@ -177,13 +194,14 @@ export function openDatabase({ path, logger }) {
 
   const stmts = {
     upsertUser: prepare(`
-      INSERT INTO users (user_id, username, username_html, avatar_url, color, created_at, updated_at, last_seen_at)
-      VALUES (@user_id, @username, @username_html, @avatar_url, @color, @now, @now, @now)
+      INSERT INTO users (user_id, username, username_html, avatar_url, color, stats, created_at, updated_at, last_seen_at)
+      VALUES (@user_id, @username, @username_html, @avatar_url, @color, @stats, @now, @now, @now)
       ON CONFLICT(user_id) DO UPDATE SET
         username = excluded.username,
         username_html = excluded.username_html,
         avatar_url = excluded.avatar_url,
         color = excluded.color,
+        stats = excluded.stats,
         updated_at = excluded.updated_at,
         last_seen_at = excluded.last_seen_at
     `),
@@ -264,6 +282,7 @@ export function openDatabase({ path, logger }) {
       username_html: user.usernameHtml || '',
       avatar_url: user.avatar || null,
       color: user.color || null,
+      stats: JSON.stringify(user.stats || {}),
       now,
     });
     return rowToUser(stmts.getUser.get(user.id));

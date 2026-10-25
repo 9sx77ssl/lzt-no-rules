@@ -364,7 +364,6 @@ function handleSocketMessage(payload) {
       return;
 
     case 'report.ok':
-      showToast('Жалоба отправлена', 'success');
       return;
 
     case 'system':

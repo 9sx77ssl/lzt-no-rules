@@ -33,6 +33,11 @@ function normalizeScopes(scope) {
   return [];
 }
 
+function safeCount(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+}
+
 function safeAvatar(value, allowExternalImages) {
   return isAllowedMediaUrl(value, { allowExternalImages }) ? value : null;
 }
@@ -86,6 +91,13 @@ export function normalizeForumUser(apiUser, { allowExternalImages = false } = {}
     isModerator: apiUser.is_moderator === true,
     profileUrl,
     shortLink: typeof apiUser.short_link === 'string' ? apiUser.short_link : null,
+    stats: {
+      likes: safeCount(apiUser.user_like_count),
+      likes2: safeCount(apiUser.user_like2_count),
+      messages: safeCount(apiUser.user_message_count),
+      trophies: safeCount(apiUser.trophy_count),
+      contests: safeCount(apiUser.contest_count),
+    },
     raw: apiUser,
   };
 }
@@ -220,6 +232,7 @@ export class AuthService {
       avatar: normalized.avatar,
       profileUrl: normalized.profileUrl,
       shortLink: normalized.shortLink,
+      stats: normalized.stats,
     };
 
     this.assertAllowed({ ...user, isBanned: normalized.isBanned });

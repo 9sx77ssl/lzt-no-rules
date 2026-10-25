@@ -66,15 +66,18 @@ test('enforces image limits', () => {
   );
 });
 
-test('extracts username colour without keeping svg icons', () => {
+test('keeps safe username svg icons and strips scripts', () => {
   const meta = extractUsernameMeta(
-    '<span style="color: #949494;" class="styleUserNickname">yolo</span><span class="uniqUsernameIcon--custom"><svg><script>alert(1)</script></svg></span>',
+    '<span style="color: #949494;" class="styleUserNickname">yolo</span><span class="uniqUsernameIcon--custom"><svg viewBox="0 0 24 24" onload="alert(1)"><path d="M5 12h14" fill="#fff" onclick="alert(2)"></path><script>alert(1)</script><foreignObject></foreignObject></svg></span>',
     'fallback',
   );
   assert.equal(meta.username, 'yolo');
   assert.equal(meta.color, '#949494');
   assert.match(meta.usernameHtml, /style="color:#949494"/);
-  assert.doesNotMatch(meta.usernameHtml, /svg|script/);
+  assert.match(meta.usernameHtml, /uniqUsernameIcon--custom/);
+  assert.match(meta.usernameHtml, /<svg viewBox="0 0 24 24">/);
+  assert.match(meta.usernameHtml, /M5 12h14/);
+  assert.doesNotMatch(meta.usernameHtml, /script|onload|onclick|foreignObject/i);
 });
 
 test('a normal plain image message survives', () => {

@@ -353,11 +353,45 @@ const CLIENT_ALLOWED_CLASSES = new Set([
   'unfurlContainer',
   'unfurlLink',
   'unfurlImage',
+  'shorted',
+  'marketItem',
+  'text',
+  'SvgIcon',
+  'categoryIcon',
+  'title',
+  'telegram',
+  'steam',
+  'discord',
+  'market',
+  'vkontakte',
+  'vk',
+  'youtube',
+  'tiktok',
+  'instagram',
+  'twitter',
+  'github',
+  'twitch',
+  'spotify',
+  'soundcloud',
+  'apple',
+  'google',
+  'epicgames',
+  'riot',
+  'minecraft',
+  'valorant',
+  'fortnite',
+  'internalNodeLink',
+  'internalLinkClicker',
+  'LinkClicker',
+  'short',
+  'KWMOver',
   'videoContainer',
   'videoWrapper',
   'spoiler',
   'bbCodeSpoiler',
 ]);
+
+const CLIENT_ALLOWED_CLASS_RE = /^(?:node\d+|category--[a-z0-9_-]+|Av\d+s|lztng-[a-z0-9-]+|fa[a-z0-9-]*)$/i;
 
 const CLIENT_ALLOWED_STYLE_PROPS = new Map([
   ['color', /^(#[0-9a-f]{3,8}|rgba?\([^)]{1,80}\)|hsla?\([^)]{1,80}\)|[a-z]{3,20})$/i],
@@ -385,6 +419,159 @@ function sanitizeClientStyle(value) {
     declarations.push(`${property}:${rawValue}`);
   }
   return declarations.join(';');
+}
+
+const USERNAME_ALLOWED_TAGS = new Set([
+  'span',
+  'svg',
+  'g',
+  'path',
+  'circle',
+  'ellipse',
+  'rect',
+  'line',
+  'polyline',
+  'polygon',
+  'defs',
+  'lineargradient',
+  'radialgradient',
+  'stop',
+  'clippath',
+  'title',
+  'desc',
+  'metadata',
+  'animate',
+  'animatetransform',
+]);
+
+const USERNAME_ALLOWED_ATTRIBUTES = new Set([
+  'viewbox',
+  'width',
+  'height',
+  'fill',
+  'stroke',
+  'stroke-width',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'preserveaspectratio',
+  'xmlns',
+  'role',
+  'transform',
+  'opacity',
+  'd',
+  'fill-rule',
+  'clip-rule',
+  'cx',
+  'cy',
+  'r',
+  'rx',
+  'ry',
+  'x',
+  'y',
+  'x1',
+  'y1',
+  'x2',
+  'y2',
+  'points',
+  'gradientunits',
+  'fx',
+  'fy',
+  'offset',
+  'stop-color',
+  'stop-opacity',
+  'clippathunits',
+  'attributename',
+  'values',
+  'from',
+  'to',
+  'by',
+  'dur',
+  'begin',
+  'repeatcount',
+  'keysplines',
+  'calcmode',
+  'type',
+]);
+
+const SAFE_ANIMATED_ATTRIBUTES = new Set([
+  'transform',
+  'stroke',
+  'fill',
+  'opacity',
+  'r',
+  'stroke-width',
+  'stroke-dasharray',
+  'd',
+  'cx',
+  'cy',
+  'x',
+  'y',
+  'x1',
+  'y1',
+  'x2',
+  'y2',
+  'offset',
+  'stop-color',
+  'stop-opacity',
+]);
+
+function sanitizeUsernameHtml(html) {
+  const template = document.createElement('template');
+  template.innerHTML = String(html || '');
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const element of nodes) {
+    const tag = element.tagName.toLowerCase();
+    if (!USERNAME_ALLOWED_TAGS.has(tag)) {
+      element.remove();
+      continue;
+    }
+    if (tag === 'animate' || tag === 'animatetransform') {
+      const attributeName = String(element.getAttribute('attributeName') || '').toLowerCase();
+      if (!SAFE_ANIMATED_ATTRIBUTES.has(attributeName)) {
+        element.remove();
+        continue;
+      }
+    }
+    for (const attribute of [...element.attributes]) {
+      const name = attribute.name;
+      const lower = name.toLowerCase();
+      if (lower.startsWith('on') || lower === 'href' || lower === 'xlink:href' || lower === 'id') {
+        element.removeAttribute(name);
+        continue;
+      }
+      if (lower === 'style') {
+        if (tag !== 'span') {
+          element.removeAttribute(name);
+          continue;
+        }
+        const safeStyle = sanitizeClientStyle(attribute.value);
+        if (safeStyle) element.setAttribute('style', safeStyle);
+        else element.removeAttribute(name);
+        continue;
+      }
+      if (lower === 'class') {
+        if (tag !== 'span') {
+          element.removeAttribute(name);
+          continue;
+        }
+        const classes = String(attribute.value || '')
+          .split(/\s+/)
+          .filter((value) => value === 'styleUserNickname' || value === 'uniqUsernameIcon--custom');
+        if (classes.length) element.setAttribute('class', classes.join(' '));
+        else element.removeAttribute(name);
+        continue;
+      }
+      if (!USERNAME_ALLOWED_ATTRIBUTES.has(lower)) {
+        element.removeAttribute(name);
+      }
+    }
+  }
+  template.content.querySelectorAll('.uniqUsernameIcon--custom').forEach((element) => {
+    if (!element.querySelector('svg')) element.remove();
+  });
+  return template.innerHTML;
 }
 
 function sanitizeClientHtml(html) {
@@ -420,7 +607,12 @@ function sanitizeClientHtml(html) {
         continue;
       }
       if (name === 'class') {
-        const kept = value.split(/\s+/).filter((className) => CLIENT_ALLOWED_CLASSES.has(className));
+        const kept = value
+          .split(/\s+/)
+          .filter(
+            (className) =>
+              CLIENT_ALLOWED_CLASSES.has(className) || CLIENT_ALLOWED_CLASS_RE.test(className),
+          );
         if (kept.length) element.className = kept.join(' ');
         else element.removeAttribute('class');
       }
