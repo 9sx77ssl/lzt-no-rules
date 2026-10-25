@@ -913,7 +913,12 @@ function enhanceUnfurls(html) {
   const template = document.createElement('template');
   template.innerHTML = linkifyHtml(sanitizeClientHtml(html));
   for (const anchor of [...template.content.querySelectorAll('a[href]')]) {
-    if (anchor.closest('.unfurlContainer, .internalNodeLink')) continue;
+    if (
+      anchor.closest(
+        '.unfurlContainer, .internalNodeLink, .node-unfurl, .node-media, .unfurl-renderer, .embed-link',
+      )
+    )
+      continue;
     if (anchor.className.includes('LbTrigger')) continue;
     const href = anchor.getAttribute('href') || '';
     if (!href) continue;
@@ -1364,6 +1369,21 @@ function htmlToBbcode(html) {
     if (node.nodeType !== Node.ELEMENT_NODE) return '';
     const element = node;
     const tag = element.tagName.toLowerCase();
+    if (element.classList?.contains('node-media') || element.classList?.contains('embed-link')) {
+      const url = element.getAttribute('data-url') || element.querySelector('a[href]')?.getAttribute('href') || '';
+      const site = element.getAttribute('data-site-id') || '';
+      return url ? `[MEDIA=${site || 'media'}]${url}[/MEDIA]` : '';
+    }
+    if (element.classList?.contains('node-unfurl') || element.classList?.contains('unfurl-renderer')) {
+      const forum = element.querySelector('a.forum-wrapper');
+      const link = element.querySelector('a.unfurl-wrapper, a[href]');
+      const href = absoluteForumUrl(forum?.getAttribute('href') || link?.getAttribute('href'));
+      if (href) {
+        return forum
+          ? `[UNFURL="${href}"]${href}[/UNFURL]`
+          : `[unfurl="${href}"]${href}[/unfurl]`;
+      }
+    }
     if (tag === 'br') return '\n';
     if (tag === 'img') {
       const alt = element.getAttribute('alt') || '';
