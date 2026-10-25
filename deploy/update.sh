@@ -21,7 +21,7 @@ cd "$APP_DIR/server"
 systemctl restart "$SERVICE"
 
 for _ in $(seq 1 20); do
-  if curl -fsS --max-time 3 "$HEALTH_URL" >/dev/null; then
+  if curl -fsS --max-time 3 "$HEALTH_URL" >/dev/null 2>&1; then
     echo "[update] healthy at $(git -C "$APP_DIR" rev-parse --short HEAD)"
     exit 0
   fi
