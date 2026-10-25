@@ -85,6 +85,12 @@ test('stores users, sessions, messages and history', () => {
     const after = db.getHistory({ after: first.message.id, limit: 10 });
     assert.equal(after.messages[0].id, second.message.id);
 
+    const afterZero = db.getHistory({ after: 0, limit: 10 });
+    assert.deepEqual(
+      afterZero.messages.map((m) => m.id),
+      [first.message.id, second.message.id],
+    );
+
     const edited = db.updateMessage({
       id: first.message.id,
       html: '<p>one edited</p>',

@@ -479,6 +479,7 @@ async function init() {
     ensureRoomLink();
     installGlobalListeners();
     loadSession();
+    loadOutbox();
     loadDraftStorage();
     observeDom();
     state.initialized = true;

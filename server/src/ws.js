@@ -68,6 +68,7 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
     const data = JSON.stringify(payload);
     for (const client of wss.clients) {
       if (client === except) continue;
+      if (!client.authenticated) continue;
       if (client.readyState !== WebSocket.OPEN) continue;
       try {
         client.send(data);
@@ -228,18 +229,13 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
   }
 
   function handleSend(ws, data) {
-    const rate = limiters.message.check(`message:${ws.user.id}`, config.rate.message);
-    if (!rate.ok) {
-      throw new ClientError('rate_limited', 'Слишком часто. Подождите немного.', {
-        retryAfterMs: rate.retryAfterMs,
-      });
-    }
-
     const clientId =
       typeof data.clientId === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(data.clientId)
         ? data.clientId
         : randomUUID();
 
+    // An unacknowledged message can be replayed after reconnect. Return the
+    // existing row before spending rate-limit tokens or writing again.
     const existing = db.getMessageByClient(ws.user.id, clientId);
     if (existing) {
       send(ws, {
@@ -251,6 +247,14 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
         serverTime: Date.now(),
       });
       return;
+    }
+
+    const rate = limiters.message.check(`message:${ws.user.id}`, config.rate.message);
+    if (!rate.ok) {
+      throw new ClientError('rate_limited', 'Слишком часто. Подождите немного.', {
+        clientId,
+        retryAfterMs: rate.retryAfterMs,
+      });
     }
 
     const html = typeof data.html === 'string' ? data.html : data.message?.html;
@@ -376,7 +380,14 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
       });
     }
     const before = data.before == null ? null : safeInteger(data.before);
-    const after = data.after == null ? null : safeInteger(data.after);
+    // `after=0` is a valid way to request the oldest retained page after a
+    // reconnect from an empty room (lastMessageId is still 0).
+    const after =
+      data.after == null
+        ? null
+        : Number(data.after) === 0
+          ? 0
+          : safeInteger(data.after);
     if (data.before != null && before == null) throw new ClientError('bad_request', 'Некорректный before');
     if (data.after != null && after == null) throw new ClientError('bad_request', 'Некорректный after');
     if (before != null && after != null) {

@@ -134,8 +134,37 @@ function sendFrame(payload) {
   }
 }
 
+function queueOutbox(payload) {
+  if (!payload || payload.type !== 'message.send' || !payload.clientId) return;
+  if (state.outbox.some((item) => item.clientId === payload.clientId)) return;
+  state.outbox.push({
+    ...payload,
+    ownerId: Number(state.user?.id) || 0,
+  });
+  saveOutbox();
+}
+
+function scheduleOutboxFlush(delay = 4000) {
+  if (state.outboxTimer) clearTimeout(state.outboxTimer);
+  state.outboxTimer = setTimeout(() => {
+    state.outboxTimer = null;
+    flushOutbox();
+  }, Math.max(800, Number(delay) || 4000));
+}
+
+function scheduleHistoryRetry(delay = 4000) {
+  if (state.historyRetryTimer) clearTimeout(state.historyRetryTimer);
+  state.historyRetryTimer = setTimeout(() => {
+    state.historyRetryTimer = null;
+    if (!state.wsAuthenticated || state.historyLoading) return;
+    if (state.historyLoaded) requestSyncAfter();
+    else requestInitialHistory();
+  }, Math.max(1000, Number(delay) || 4000));
+}
+
 function sendWs(payload) {
   if (!payload || typeof payload !== 'object') return false;
+  if (payload.type === 'message.send' && payload.clientId) queueOutbox(payload);
   if (
     state.ws &&
     state.ws.readyState === WebSocket.OPEN &&
@@ -143,29 +172,41 @@ function sendWs(payload) {
   ) {
     return sendFrame(payload);
   }
-  if (payload.type === 'message.send' && payload.clientId) {
-    if (!state.outbox.some((item) => item.clientId === payload.clientId)) {
-      state.outbox.push(payload);
-    }
-  }
   return false;
 }
 
 function flushOutbox() {
+  if (state.outboxTimer) {
+    clearTimeout(state.outboxTimer);
+    state.outboxTimer = null;
+  }
   if (!state.wsAuthenticated || !state.outbox.length) return;
-  const queued = state.outbox.splice(0, state.outbox.length);
-  for (const payload of queued) {
+  // Keep unacknowledged payloads in the outbox. A reconnect may resend them;
+  // server-side clientId dedup makes that safe. Remove only on message.new.
+  for (const payload of [...state.outbox]) {
+    const ownerId = Number(payload.ownerId) || 0;
+    if (ownerId && state.user?.id && ownerId !== state.user.id) {
+      state.outbox = state.outbox.filter((item) => item.clientId !== payload.clientId);
+      saveOutbox();
+      continue;
+    }
     const pending = payload.clientId ? state.pending.get(payload.clientId) : null;
     if (pending?.failed) continue;
-    if (!sendFrame(payload)) {
-      state.outbox.push(payload);
-      continue;
+    const { ownerId: _ownerId, ...frame } = payload;
+    if (!sendFrame(frame)) {
+      if (pending) {
+        pending.queued = true;
+        state.pending.set(payload.clientId, pending);
+      }
+      scheduleReconnect(3000);
+      return;
     }
     if (pending) {
       pending.queued = false;
       state.pending.set(payload.clientId, pending);
     }
   }
+  saveOutbox();
 }
 
 async function connectNoRules({ forceToken = false, userInitiated = false } = {}) {
@@ -186,6 +227,10 @@ async function connectNoRules({ forceToken = false, userInitiated = false } = {}
     state.reconnectTimer = null;
   }
   stopHeartbeat();
+  if (state.historyRetryTimer) {
+    clearTimeout(state.historyRetryTimer);
+    state.historyRetryTimer = null;
+  }
   if (state.ws) {
     const previous = state.ws;
     state.ws = null;
@@ -197,6 +242,7 @@ async function connectNoRules({ forceToken = false, userInitiated = false } = {}
   }
 
   state.wsAuthenticated = false;
+  state.historyLoading = false;
   state.pendingTemporaryToken = null;
   state.connectionError = '';
   if (userInitiated) {
@@ -297,6 +343,8 @@ function openNoRulesSocket(mode) {
     if (state.ws !== ws) return;
     state.ws = null;
     state.wsAuthenticated = false;
+    // A half-finished history request must not block the sync after reconnect.
+    state.historyLoading = false;
     stopHeartbeat();
     setWsState('disconnected');
     if (state.active && !state.connectionError) {
@@ -417,11 +465,15 @@ function handleAuthError(payload) {
   const code = String(payload?.code || 'auth_failed');
   const message = String(payload?.message || 'Не удалось авторизоваться');
   state.wsAuthenticated = false;
+  state.historyLoading = false;
   state.authError = message;
   state.connectionError = message;
   setWsState('disconnected');
 
   if (code === 'invalid_session' || code === 'session_expired') {
+    // The database or this session may have been reset. Drop the local room
+    // cache so the next auth starts from a fresh history window.
+    resetMessageCache();
     clearSession();
     state.forceTokenOnReconnect = true;
     scheduleReconnect(Number(payload?.retryAfterMs) || 300);
@@ -436,6 +488,7 @@ function handleAuthError(payload) {
     code === 'token_expired' ||
     code === 'auth_failed'
   ) {
+    resetMessageCache();
     clearSession();
     state.forceTokenOnReconnect = true;
     if (state.active && state.tokenRetryCount < 2) {
@@ -556,11 +609,11 @@ function requestOlderMessages() {
 }
 
 function requestSyncAfter() {
-  if (!state.wsAuthenticated || state.historyLoading || !state.lastMessageId) return;
+  if (!state.wsAuthenticated || state.historyLoading) return;
   state.historyLoading = true;
   const sent = sendWs({
     type: 'history',
-    after: Number(state.lastMessageId),
+    after: Number(state.lastMessageId) || 0,
     limit: 100,
   });
   if (!sent) state.historyLoading = false;
@@ -583,6 +636,15 @@ function disconnectNoRules({ clear = false } = {}) {
   }
   state.wsAuthenticated = false;
   state.connecting = false;
+  state.historyLoading = false;
+  if (state.outboxTimer) {
+    clearTimeout(state.outboxTimer);
+    state.outboxTimer = null;
+  }
+  if (state.historyRetryTimer) {
+    clearTimeout(state.historyRetryTimer);
+    state.historyRetryTimer = null;
+  }
   setWsState('disconnected');
   if (clear) {
     clearSession();
@@ -591,7 +653,9 @@ function disconnectNoRules({ clear = false } = {}) {
     state.deletedIds.clear();
     state.onlineUsers = [];
     state.pending.clear();
+    state.pendingEdits.clear();
     state.outbox = [];
+    saveOutbox();
     state.typing.clear();
     state.historyLoaded = false;
     state.historyHasMore = false;

@@ -9,13 +9,13 @@ cd server
 bun test
 ```
 
-`bun test` запускает 20 unit-тестов: auth, antibot, db, rate limit,
+`bun test` запускает 21 unit-тест: auth, antibot, db, rate limit,
 sanitize. Playwright-сценарии лежат вне репозитория из-за storageState.
 
 ## 2. Сборка
 
 ```bash
-NR_VERSION=1.1.16 \
+NR_VERSION=1.1.20 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -156,9 +156,18 @@ Escape.
 6. `context.setOffline(true)` → дождаться `wsState !== 'connected'` →
    `window.__noRulesChat.send('offline ...')`.
    Ожидается `pending: 1`, `outbox: 1`, toast про очередь.
-7. `context.setOffline(false)` → `reconnect()`.
+7. Проверить `localStorage['lzt.no-rules.outbox.v1']`; закрыть страницу и
+   открыть её снова (или `page.reload()`): outbox должен восстановиться,
+   после `auth.ok` — уйти в 0.
+8. `context.setOffline(false)` → `reconnect()`.
    Ожидается `outbox: 0`, `pending: 0`, ровно одно сообщение с текстом
    (дедупликация по `clientId`).
+9. Отправить 10 сообщений offline, затем online: первые 8 проходят сразу,
+   остальные автоматически повторяются после `rate_limited`; итог —
+   ровно 10 уникальных ID, `outbox: 0`.
+10. Пустая комната: `lastMessageId === 0`, другое подключение отправляет
+    сообщение, затем первый клиент reconnect → должен получить его через
+    `history after=0`.
 
 ## 8. История > 60 сообщений
 

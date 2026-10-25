@@ -9,7 +9,7 @@
 
 [SIZE=5]No Rules — это не замена приватных чатов и не E2E-шифрование. Это отдельная комната для тех, у кого установлен userscript.[/SIZE]
 
-[SIZE=3][COLOR=#aaaaaa]Сервер: wss://lztws.d9v.uk/ws · Health: https://lztws.d9v.uk/health · Версия: 1.1.19[/COLOR][/SIZE][/CENTER]
+[SIZE=3][COLOR=#aaaaaa]Сервер: wss://lztws.d9v.uk/ws · Health: https://lztws.d9v.uk/health · Версия: 1.1.20[/COLOR][/SIZE][/CENTER]
 
 [CENTER][SIZE=6][button=https://raw.githubusercontent.com/9sx77ssl/lzt-no-rules/main/extension/dist/no-rules.user.js] УСТАНОВИТЬ [/button][/SIZE]
 [SIZE=2][COLOR=#aaaaaa]Chrome / Edge / Firefox · Tampermonkey или Violentmonkey · один общий userscript[/COLOR][/SIZE]
@@ -48,6 +48,7 @@
 [*][B]BBCode:[/B] B, I, U, S, CODE, QUOTE, URL, IMG, MEDIA, UNFURL, USER — можно вставлять готовые форумные блоки, они отрендерятся.
 [*][B]Копирование в BBCode:[/B] фото, медиа, аккаунты, ссылки, упоминания и форматирование копируются как IMG, MEDIA, UNFURL и т.д.
 [*][B]История с подгрузкой,[/B] сохранение позиции скролла, счётчик непрочитанных, кнопка «новые сообщения».
+[*][B]Сообщения не теряются при обрыве.[/B] Отправленное в офлайне лежит в outbox, переживает F5, отправляется после reconnect и не дублируется благодаря clientId. Если сервер ответил rate limit, клиент сам повторяет пачку после паузы.
 [*][B]Presence, typing, системные сообщения и жалобы.[/B] В «Онлайн: N» показываются участники именно No Rules.
 [*][B]Никаких собственных тостов.[/B] В нативном Chatbox их нет — диагностика только в console.debug.
 [/LIST]
@@ -67,13 +68,13 @@
 [LIST=1]
 [*]Поставь [B]Tampermonkey[/B] (Chrome / Edge / Firefox) или [B]Violentmonkey[/B] (Firefox / Chrome).
 [*]Нажми кнопку [B]УСТАНОВИТЬ[/B] выше.
-[*]Удали старые копии No Rules, если они есть, и оставь одну версию [B]1.1.19[/B].
+[*]Удали старые копии No Rules, если они есть, и оставь одну версию [B]1.1.20[/B].
 [*]Открой [URL=https://lolz.team/chatbox/]lolz.team/chatbox/[/URL], боковое меню → [B]No Rules[/B].
 [*]При первом входе форум выдаст короткоживущий токен. Пароль и cookies никуда не отправляются.
 [/LIST]
 
 [SIZE=4][B]Если Firefox пишет «Онлайн: 0»[/B][/SIZE]
-[SIZE=4]Обнови userscript до [B]1.1.19[/B]. В этой версии исправлен Firefox/Tampermonkey: WebSocket с [B]Origin: null[/B] больше не отбивается сервером, а клиент использует page fetch/socket. Старые копии 1.0.1/1.1.8 нужно удалить.[/SIZE]
+[SIZE=4]Обнови userscript до [B]1.1.20[/B]. Начиная с 1.1.19 исправлен Firefox/Tampermonkey: WebSocket с [B]Origin: null[/B] больше не отбивается сервером, а клиент использует page fetch/socket. Старые копии 1.0.1/1.1.8 нужно удалить.[/SIZE]
 
 [CENTER][SIZE=4][B]Ссылки[/B][/SIZE]
 [URL=https://github.com/9sx77ssl/lzt-no-rules]GitHub: 9sx77ssl/lzt-no-rules[/URL]

@@ -131,10 +131,10 @@ state = {
   ws, wsAuthenticated, wsState,
   messages: Map<id, message>,
   pending: Map<clientId, pending>,
-  outbox: [],
+  outbox: [], outboxTimer,
   typing: Map<userId, entry>,
   replyTo, editing,
-  historyLoading, historyHasMore,
+  historyLoading, historyHasMore, historyRetryTimer,
   online, onlineUsers,
   templates, hiddenNative,
   replyTo, editing,
@@ -143,6 +143,14 @@ state = {
 
 `state.messages` — серверные сообщения; `state.pending` — оптимистичные.
 `allVisibleMessages()` склеивает их по времени/ID.
+
+`state.outbox` — это unacknowledged `message.send`, а не просто очередь
+«пока нет сокета». Запись хранится в
+`localStorage['lzt.no-rules.outbox.v1']` (до 100 сообщений, с `ownerId`),
+удаляется только после `message.new`/`history` с тем же `clientId`.
+Поэтому F5, обрыв и повторный `flushOutbox()` не теряют сообщение; сервер
+идемпотентно возвращает уже созданную строку. При `rate_limited` клиент
+оставляет запись в outbox и повторяет её после `retryAfterMs`.
 
 ## 5. Жизненный цикл
 

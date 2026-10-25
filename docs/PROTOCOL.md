@@ -71,6 +71,7 @@
 {"type":"history","limit":60}
 {"type":"history","before":123,"limit":50}
 {"type":"history","after":456,"limit":100}
+{"type":"history","after":0,"limit":100}   // пустая комната / первый sync
 ```
 
 Ответ:
@@ -197,9 +198,14 @@
 - После `close` клиент делает exponential backoff (1–30 с), затем `resume`.
 - Если `resume` отклонён, клиент получает новый временный токен и делает
   `auth`.
-- После `auth.ok` клиент догоняет историю через `history` с `after`.
-- Если соединение пропало, `message.send` кладётся в outbox и отправляется
-  после `auth.ok`; дедупликация по `clientId` защищает от повторов.
+- После `auth.ok` клиент догоняет историю через `history` с `after`;
+  `after=0` допустим и означает «с начала сохранённого потока».
+- Если соединение пропало, `message.send` кладётся в outbox, переживает
+  F5 (`localStorage`) и отправляется после `auth.ok`; дедупликация по
+  `clientId` защищает от повторов. Сервер проверяет `clientId` до
+  rate-limit, чтобы replay не расходовал токены и не терялся при retry.
+- `rate_limited` для `message.send` содержит `clientId` и `retryAfterMs`;
+  клиент оставляет сообщение в outbox и повторяет его автоматически.
 
 ## 8. Онлайн-модалка
 

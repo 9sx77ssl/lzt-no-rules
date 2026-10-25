@@ -44,6 +44,7 @@ const STORAGE_KEYS = {
   session: 'lzt.no-rules.session.v1',
   draft: 'lzt.no-rules.draft.v1',
   active: 'lzt.no-rules.active.v1',
+  outbox: 'lzt.no-rules.outbox.v1',
 };
 
 const HASH = {
@@ -91,10 +92,12 @@ const state = {
   pending: new Map(),
   pendingEdits: new Map(),
   outbox: [],
+  outboxTimer: null,
   lastMessageId: 0,
   historyLoaded: false,
   historyHasMore: false,
   historyLoading: false,
+  historyRetryTimer: null,
   syncPages: 0,
   oldestId: null,
   online: 0,
@@ -273,6 +276,50 @@ function clearSession() {
   state.session = null;
   state.sessionExpiresAt = 0;
   removeKey(STORAGE_KEYS.session);
+}
+
+function saveOutbox() {
+  if (!state.outbox.length) {
+    removeKey(STORAGE_KEYS.outbox);
+    return;
+  }
+  writeJson(
+    STORAGE_KEYS.outbox,
+    state.outbox.slice(-100).map((payload) => ({
+      type: 'message.send',
+      clientId: payload.clientId,
+      html: payload.html,
+      replyTo: payload.replyTo ?? null,
+      ownerId: Number(payload.ownerId || state.user?.id) || 0,
+    })),
+  );
+}
+
+function loadOutbox() {
+  const saved = readJson(STORAGE_KEYS.outbox);
+  if (!Array.isArray(saved)) return;
+  const restored = [];
+  const seen = new Set();
+  for (const payload of saved.slice(-100)) {
+    if (!payload || payload.type !== 'message.send') continue;
+    if (typeof payload.clientId !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(payload.clientId)) continue;
+    if (typeof payload.html !== 'string' || !payload.html || payload.html.length > 24_000) continue;
+    if (seen.has(payload.clientId)) continue;
+    seen.add(payload.clientId);
+    restored.push({
+      type: 'message.send',
+      clientId: payload.clientId,
+      html: payload.html,
+      replyTo:
+        payload.replyTo == null
+          ? null
+          : Number.isFinite(Number(payload.replyTo))
+            ? Number(payload.replyTo)
+            : null,
+      ownerId: Number(payload.ownerId) || 0,
+    });
+  }
+  state.outbox = restored;
 }
 
 function isSameDay(a, b) {

@@ -221,6 +221,9 @@ function mergeHistoryMessages(messages, { mode = 'initial' } = {}) {
     if (message.deleted) {
       state.deletedIds.add(id);
       if (state.messages.delete(id)) changed = true;
+      // Deleted rows are still part of the server-side id stream. Advance the
+      // sync cursor so an all-deleted history page cannot be requested twice.
+      updateLastMessageId([message]);
       continue;
     }
     const existing = state.messages.get(id);
@@ -244,11 +247,11 @@ function mergeHistoryMessages(messages, { mode = 'initial' } = {}) {
     }
     if (message.clientId) {
       removePending(message.clientId);
-      state.outbox = state.outbox.filter((payload) => payload.clientId !== message.clientId);
     }
     updateLastMessageId([message]);
   }
 
+  saveOutbox();
   const ids = [...state.messages.keys()];
   if (ids.length) {
     state.oldestId = Math.min(...ids);
@@ -331,6 +334,7 @@ function handleIncomingDelete(payload) {
   if (!Number.isFinite(id)) return;
   state.deletedIds.add(id);
   state.messages.delete(id);
+  if (id > state.lastMessageId) state.lastMessageId = id;
   state.pendingEdits.delete(id);
   if (state.replyTo?.id === id) cancelReply();
   if (state.editing?.id === id) cancelEdit({ restore: true });
@@ -568,9 +572,7 @@ function retryPending(clientId) {
   const sent = sendWs(pending.payload);
   if (!sent) {
     pending.queued = true;
-    if (!state.outbox.some((payload) => payload.clientId === clientId)) {
-      state.outbox.push(pending.payload);
-    }
+    queueOutbox(pending.payload);
     showToast('Сообщение будет отправлено после подключения.', 'info');
   }
 }
@@ -578,10 +580,24 @@ function retryPending(clientId) {
 function removePending(clientId) {
   if (!clientId) return;
   const pending = state.pending.get(clientId);
-  if (!pending) return;
-  state.pending.delete(clientId);
+  if (pending) state.pending.delete(clientId);
   state.outbox = state.outbox.filter((payload) => payload.clientId !== clientId);
-  if (state.active) renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
+  saveOutbox();
+  if (pending && state.active) {
+    renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
+  }
+}
+
+function resetMessageCache() {
+  state.messages.clear();
+  state.deletedIds.clear();
+  state.pendingEdits.clear();
+  state.historyLoaded = false;
+  state.historyHasMore = false;
+  state.historyLoading = false;
+  state.syncPages = 0;
+  state.lastMessageId = 0;
+  state.oldestId = null;
 }
 
 function editLastOwnMessage() {
@@ -667,9 +683,7 @@ async function sendCurrentMessage() {
   const sent = sendWs(payload);
   if (!sent) {
     pending.queued = true;
-    if (!state.outbox.some((item) => item.clientId === clientId)) {
-      state.outbox.push(payload);
-    }
+    queueOutbox(payload);
     showToast('Нет соединения. Сообщение будет отправлено после подключения.', 'info');
   }
 }
@@ -679,11 +693,36 @@ function handleServerError(payload) {
   const message = String(payload?.message || 'Ошибка сервера');
   const clientId = payload?.clientId;
   const messageId = Number(payload?.messageId ?? payload?.id);
+
+  if (!clientId && !Number.isFinite(messageId) && state.historyLoading) {
+    // A failed history page must not leave the room permanently stuck behind
+    // the loading spinner. Retry after the server's backoff window.
+    state.historyLoading = false;
+    scheduleHistoryRetry(Number(payload?.retryAfterMs) || 4000);
+    if (state.active) renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
+    return;
+  }
+
+  if (code === 'rate_limited') {
+    const pending = clientId ? state.pending.get(clientId) : null;
+    if (pending) {
+      pending.failed = false;
+      pending.queued = true;
+      state.pending.set(clientId, pending);
+    }
+    // The payload stays in the outbox and will be retried after the server's
+    // token bucket refills. This is expected during a large offline replay.
+    scheduleOutboxFlush(Number(payload?.retryAfterMs) || 4000);
+    if (state.active) renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
+    return;
+  }
+
   if (clientId && state.pending.has(clientId)) {
     const pending = state.pending.get(clientId);
     if (code === 'duplicate') {
       state.pending.delete(clientId);
       state.outbox = state.outbox.filter((item) => item.clientId !== clientId);
+      saveOutbox();
       renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
       showToast('Такое сообщение уже отправлено', 'info');
       return;
@@ -691,10 +730,15 @@ function handleServerError(payload) {
     pending.failed = true;
     pending.queued = false;
     state.outbox = state.outbox.filter((item) => item.clientId !== clientId);
+    saveOutbox();
     state.pending.set(clientId, pending);
     if (state.active) renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
     showToast(message, 'error');
     return;
+  }
+  if (clientId) {
+    state.outbox = state.outbox.filter((item) => item.clientId !== clientId);
+    saveOutbox();
   }
   if (Number.isFinite(messageId)) {
     if (state.pendingEdits.has(messageId)) {
@@ -754,6 +798,10 @@ function applyHistoryPage(payload) {
   const mode = payload?.after != null ? 'after' : payload?.before != null ? 'before' : 'initial';
   mergeHistoryMessages(messages, { mode });
   state.historyLoading = false;
+  if (state.historyRetryTimer) {
+    clearTimeout(state.historyRetryTimer);
+    state.historyRetryTimer = null;
+  }
 
   if (mode === 'initial') {
     state.historyLoaded = true;
@@ -781,7 +829,7 @@ function applyHistoryPage(payload) {
   if (state.active) {
     renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
   }
-  if (payload.hasMore && messages.length && state.syncPages < 10) {
+  if (payload.hasMore && messages.length && state.syncPages < 50) {
     state.syncPages += 1;
     requestSyncAfter();
   }
