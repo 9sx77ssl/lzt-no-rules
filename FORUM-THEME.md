@@ -16,6 +16,23 @@
 
 [SIZE=3][B]Важно: удали все старые копии No Rules в Tampermonkey.[/B] Версии 1.0.1 и 1.1.8 конфликтуют с новой и могут ломать авторизацию.[/SIZE][/CENTER]
 
+[CENTER][SIZE=4][B]Как это работает по-человечески[/B][/SIZE][/CENTER]
+
+[SIZE=4][B]No Rules — это не отдельный сайт и не ещё один iframe.[/B] Userscript находит живой Chatbox прямо на Lolzteam, добавляет в боковое меню пятый пункт и подменяет список сообщений на свой. Внешне это тот же чат: те же группы, аватарки, плашки, reply, редактирование, меню по правому клику и мобильные свайпы.[/SIZE]
+
+[SIZE=4][B]Собственный сокет написан с нуля.[/B] Нативный Chatbox ходит на сервер форума, а No Rules — на отдельный WebSocket-backend на Bun. Он хранит сообщения в SQLite, выдаёт сессии, считает онлайн, принимает typing, отдаёт историю и переподключается, если интернет моргнул. Поэтому это реально отдельная комната, а не имитация нативной.[/SIZE]
+
+[SIZE=4][B]Перенесли не чат, а его поведение.[/B] Из нативного Chatbox взяты Svelte-классы и CSS, composer на Tiptap, контекстное меню, reply/edit-бары, mention-блоки, карточки ссылок, видео-плеер, fancybox для фото и увеличение одиночного смайла. Серверную часть, авторизацию, историю, presence и переподключение написали заново под свой backend.[/SIZE]
+
+[LIST]
+[*][B]Визуал:[/B] нативные chat2-message-group, chat2-message-block, message-actions, chat2-replying, chat2-message-editing и те же CSS-переменные темы.
+[*][B]Контент:[/B] текст, фото, видео, YouTube/SoundCloud/TikTok, форумные unfurl-карточки, market/аккаунты, упоминания и BBCode.
+[*][B]Поведение:[/B] reply с полным HTML, edit, delete, ArrowUp → edit last, две одинаковые сообщения подряд, unread, история, скролл и мобильные жесты.
+[*][B]Своё:[/B] WebSocket-сервер, SQLite, auth через временный токен форума, rate limit, санитайзер, outbox при обрыве и Firefox-фиксы.
+[/LIST]
+
+[SIZE=4][B]Чат без правил — но не без границ.[/B] Комната называется No Rules, потому что это отдельное пространство без нативных правил и модерации форума. Но доступ только у тех, у кого стоит userscript, плюс есть серверные лимиты на спам и sanitize HTML. Пароль и cookies форума на наш backend не отправляются.[/SIZE]
+
 [SIZE=4][B]Что умеет[/B][/SIZE]
 [LIST]
 [*][B]Отдельная комната No Rules[/B] в нативном боковом меню Chatbox. Работает в полноэкранном /chatbox/ и в плавающем виджете на любой странице.
@@ -39,11 +56,11 @@
 
 [SIZE=4]Расширение не рисует «свой чат сбоку». Оно клонирует живые классы Svelte Chatbox: [B]chat2-message-group[/B], [B]chat2-message-block[/B], [B]message-actions[/B], [B]chat2-replying[/B], [B]chat2-message-editing[/B]. Недостающие CSS ленивых чанков (меню, spinner, online-модалка, video player, unfurl) скопированы с теми же хешами.[/SIZE]
 
-[SIZE=4]Фото открываются через нативный [B]LbTrigger[/B] и fancybox, видео — через [B]XenForo.VideoPlayer[/B] и [B][data-lzt-video-player][/B], смайлы — через нативный [B]mceSmilieLarge[/B].[/SIZE]
+[SIZE=4]Фото открываются через нативный [B]LbTrigger[/B] и fancybox, видео — через [B]XenForo.VideoPlayer[/B] и [B]data-lzt-video-player[/B], смайлы — через нативный [B]mceSmilieLarge[/B].[/SIZE]
 
 [QUOTE]
-[SIZE=4][B]Техническая часть[/B][/SIZE]
-[SIZE=3]Userscript + отдельный backend на Bun, WebSocket и SQLite. Авторизация через временный токен форума: на сервер уходит только read-JWT, пароль и cookies форума — нет. Сессия хранится как SHA-256, сам JWT не пишется в БД и логи. Для unfurl используется отдельный basic/post-токен только локально в браузере — на backend он не отправляется.[/SIZE]
+[SIZE=4][B]Техническая часть без мата[/B][/SIZE]
+[SIZE=3]Userscript находит элемент .chat2 с aria-label chatbox, получает нативные шаблоны из живого DOM и рисует свою комнату поверх. Сообщения идут по WebSocket на wss://lztws.d9v.uk/ws; backend на Bun принимает их, проверяет временный read-JWT форума и кладёт в SQLite. В БД хранится только SHA-256 от нашей сессии, сам forum-JWT не сохраняется и не логируется. Отдельный basic post-токен нужен только браузеру для /editor/unfurl — на backend он не уходит.[/SIZE]
 [/QUOTE]
 
 [SIZE=4][B]Установка[/B][/SIZE]
