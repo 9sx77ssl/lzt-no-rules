@@ -1041,6 +1041,18 @@ function pageOrigin() {
   return PAGE_WINDOW?.location?.origin || location.origin;
 }
 
+function pageFetch(input, init) {
+  const fn = PAGE_WINDOW?.fetch;
+  if (typeof fn === 'function' && fn !== fetch) {
+    try {
+      return fn.call(PAGE_WINDOW, input, init);
+    } catch {
+      // fall through to the sandbox fetch
+    }
+  }
+  return fetch(input, init);
+}
+
 async function getForumApiToken() {
   if (forumApiToken && Date.now() < forumApiTokenExpiresAt - 60_000) return forumApiToken;
   if (forumApiTokenPromise) return forumApiTokenPromise;
@@ -1176,7 +1188,7 @@ async function fetchForumUnfurl(url, token) {
   body.append('_xfToken', csrf);
   body.append('_xfResponseType', 'json');
   try {
-    const response = await fetch('https://api.lolz.team/editor/unfurl', {
+    const response = await pageFetch('https://api.lolz.team/editor/unfurl', {
       method: 'POST',
       credentials: 'include',
       cache: 'no-store',
