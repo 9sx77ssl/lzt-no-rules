@@ -78,6 +78,19 @@ widget, где соответствующий чанк ещё не загруж�
   DOM. В истории серверные `deleted` отбрасываются, а reply на удалённое
   показывает «Сообщение удалено», как нативный чат.
 
+## 5.0. Mentions и reply
+
+При отправке plain `@ник` клиент вызывает `POST /members/find`, берёт точное
+совпадение и собирает нативный блок:
+`a.notranslate.username.mention[data-user="id, nick"]` + `img.avatar` +
+`span.styleUserNickname.styleN` + `uniqUsernameIcon--custom`. Для своего id
+добавляется `highlight` (зелёный фон). Если ника нет — текст остаётся как есть.
+
+Reply хранит `reply_html` (полный санитайзенный HTML цели) в БД. В сообщении
+он рендерится внутри `span.chat2-reply-text` с нативными классами, поэтому
+изображения, embeds, unfurl и mentions сохраняются. Reply-бар при вводе также
+показывает rich HTML (с ограничением высоты/скроллом).
+
 ## 5.1. Embeds и копирование
 
 Tiptap при вставке ссылки создаёт нативные Svelte-ноды `.unfurl-renderer`

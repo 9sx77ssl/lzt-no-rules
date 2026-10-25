@@ -133,6 +133,17 @@ Escape.
   «Скопировать медиа»; они появляются только при клике по `img`/`video`.
 - После copy/ошибок не должно появляться `.nr-toast`; только `console.debug`.
 
+## 6.5. Mentions и reply
+
+- В composer набрать `@жди`, закрыть popup (Escape), отправить. Должен
+  появиться `a.mention` 24 px с аватаром 16×16, цветом `styleN` и SVG-значком;
+  несуществующий `@zzz...` остаётся текстом.
+- `@yolo` (свой id) — на блоке `highlight`, зелёный фон.
+- Reply на сообщение с изображением/YouTube/SoundCloud/форумным блоком:
+  reply-бар и зелёный reply-блок должны содержать полный HTML, а не
+  `[изображение]`/plain text.
+- Copy такого reply — `[USER=id]@ник[/USER]`, `[MEDIA=...]`, `[unfurl]`.
+
 ## 7. Lifecycle: hash, refresh, reconnect, offline
 
 1. Открыть `https://lolz.team/chatbox/#no-rules` с чистым контекстом.
