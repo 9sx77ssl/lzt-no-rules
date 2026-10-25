@@ -76,6 +76,104 @@ const NR_CSS = `
   max-width: 100%;
 }
 
+
+/* Native unfurl renderer CSS lives inside the Tiptap lazy chunk. After a
+   reload there may be no unfurl node in the composer, so the old messages
+   would lose their forum/media card styling. Copy the native rules here. */
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-renderer {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-wrapper {
+  position: relative;
+  display: flex;
+  background-color: #ffffff14;
+  box-shadow: 0 0 0 1px inset #ffffff14;
+  padding: 2px 6px;
+  color: var(--contentText);
+  font-weight: 700;
+  border-radius: 8px;
+  overflow: hidden;
+  max-width: 100%;
+  min-width: 0;
+  width: fit-content !important;
+  margin: 2px 0;
+  transition: all 0.1s ease-in-out;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-wrapper:hover {
+  background-color: #ffffff24;
+  text-decoration: none;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-content .unfurlMarketTitle {
+  line-height: 20px;
+  color: var(--contentText);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-price {
+  padding: 0 4px;
+  height: 20px;
+  line-height: 20px;
+  border-radius: 4px;
+  background-color: #ffffff1a;
+  color: var(--contentText);
+  text-wrap: nowrap;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-review-icon {
+  height: 20px;
+  width: 20px;
+  background-size: 100% 100%;
+  flex-shrink: 0;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .forum-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background-color: #ffffff14;
+  box-shadow: 0 0 0 1px inset #ffffff1f;
+  color: var(--contentText);
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  width: fit-content !important;
+  margin: 2px 0;
+  line-height: 24px;
+  transition: all 0.1s ease-in-out;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .forum-wrapper:hover {
+  text-decoration: none;
+  background-color: #ffffff24;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .forum-icon {
+  font-family: 'lztIcons';
+  display: flex;
+  align-items: center;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .forum-title {
+  font-weight: 700;
+  color: var(--contentText);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-renderer a {
+  border: 1px solid transparent;
+}
+
 .nr-room-unread {
   display: inline-flex;
   align-items: center;
@@ -927,6 +1025,42 @@ function marketCardFor(href) {
   return card;
 }
 
+
+function mediaCardFor(href) {
+  let url;
+  try {
+    url = new URL(href, location.origin);
+  } catch {
+    return null;
+  }
+  const site = mediaServiceForUrl(url.href);
+  if (!site) return null;
+  let mediaId = url.href;
+  if (site === 'youtube') mediaId = url.searchParams.get('v') || url.pathname.split('/').filter(Boolean).pop() || url.href;
+  const card = document.createElement('span');
+  card.className = 'embed-link';
+  card.dataset.url = url.href;
+  card.dataset.mediaId = mediaId;
+  card.dataset.siteId = site;
+  const wrapper = document.createElement('span');
+  wrapper.className = 'embed-link-wrapper';
+  const icon = document.createElement('span');
+  icon.className = `mini_unfurl_icon ${site} embed-icon`;
+  const link = document.createElement('a');
+  link.className = 'internal-link';
+  link.href = url.href;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer nofollow';
+  link.setAttribute('ignore-opener', 'true');
+  link.setAttribute('data-ignore-popover', 'true');
+  link.textContent = UNFURL_LABELS[site] || site;
+  const visit = document.createElement('span');
+  visit.className = 'visit-icon';
+  wrapper.append(icon, link, visit);
+  card.appendChild(wrapper);
+  return card;
+}
+
 function forumCardFor(href) {
   let url;
   try {
@@ -960,8 +1094,16 @@ function applyMentionHighlights(root) {
 }
 
 function enhanceUnfurls(html) {
+  const pre = document.createElement('template');
+  pre.innerHTML = sanitizeClientHtml(html);
+  // Tiptap can persist an autolink mark as <a>text</a> without href.
+  for (const anchor of [...pre.content.querySelectorAll('a:not([href])')]) {
+    if (anchor.closest('.mention, .unfurlContainer, .internalNodeLink, .node-unfurl, .node-media, .unfurl-renderer, .embed-link, .LbTrigger')) continue;
+    const text = (anchor.textContent || '').trim();
+    if (/^https?:\/\//i.test(text)) anchor.replaceWith(document.createTextNode(text));
+  }
   const template = document.createElement('template');
-  template.innerHTML = linkifyHtml(sanitizeClientHtml(html));
+  template.innerHTML = linkifyHtml(pre.innerHTML);
   for (const anchor of [...template.content.querySelectorAll('a[href]')]) {
     if (
       anchor.closest(
@@ -972,7 +1114,7 @@ function enhanceUnfurls(html) {
     if (anchor.className.includes('LbTrigger')) continue;
     const href = anchor.getAttribute('href') || '';
     if (!href) continue;
-    const card = marketCardFor(href) || forumCardFor(href);
+    const card = mediaCardFor(href) || marketCardFor(href) || forumCardFor(href);
     if (card) anchor.replaceWith(card);
   }
   return template.innerHTML;

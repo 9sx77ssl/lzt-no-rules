@@ -466,9 +466,14 @@ async function saveEdit() {
   const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
   let html = rawHtml;
   try {
-    html = await resolvePlainMentions(rawHtml);
+    html = await resolvePlainUnfurls(rawHtml);
   } catch {
     html = rawHtml;
+  }
+  try {
+    html = await resolvePlainMentions(html);
+  } catch {
+    // keep already resolved unfurls
   }
   const previous = { ...target };
   target.html = sanitizeClientHtml(html);
@@ -570,9 +575,14 @@ async function sendCurrentMessage() {
   const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
   let html = rawHtml;
   try {
-    html = await resolvePlainMentions(rawHtml);
+    html = await resolvePlainUnfurls(rawHtml);
   } catch {
     html = rawHtml;
+  }
+  try {
+    html = await resolvePlainMentions(html);
+  } catch {
+    // keep already resolved unfurls
   }
   if (html.length > 24_000) {
     showToast('Сообщение слишком длинное', 'error');

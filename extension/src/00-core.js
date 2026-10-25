@@ -1020,6 +1020,271 @@ async function resolvePlainMentions(html) {
   return template.innerHTML;
 }
 
+
+const AUTO_URL_RE = /https?:\/\/[^\s<>"'`]+/gi;
+const AUTO_UNFURL_SKIP =
+  'a, code, pre, .mention, .unfurlContainer, .internalNodeLink, .node-unfurl, .node-media, .unfurl-renderer, .embed-link, .Tooltip, .LbTrigger';
+const UNFURL_LABELS = {
+  youtube: 'Видео на Youtube',
+  soundcloud: 'Трек на Soundcloud',
+  tiktok: 'Видео на TikTok',
+  spotify: 'Трек на Spotify',
+  twitch: 'Трансляция на Twitch',
+  vimeo: 'Видео на Vimeo',
+  coub: 'Видео на Coub',
+};
+let forumApiToken = '';
+let forumApiTokenExpiresAt = 0;
+let forumApiTokenPromise = null;
+
+function pageOrigin() {
+  return PAGE_WINDOW?.location?.origin || location.origin;
+}
+
+async function getForumApiToken() {
+  if (forumApiToken && Date.now() < forumApiTokenExpiresAt - 60_000) return forumApiToken;
+  if (forumApiTokenPromise) return forumApiTokenPromise;
+  forumApiTokenPromise = (async () => {
+    const csrf = getCsrfToken();
+    if (!csrf) return '';
+    const body = new URLSearchParams();
+    body.append('scope[]', 'basic');
+    body.append('scope[]', 'post');
+    body.append('_xfRequestUri', location.pathname + location.search);
+    body.append('_xfNoRedirect', '1');
+    body.append('_xfToken', csrf);
+    body.append('_xfResponseType', 'json');
+    try {
+      const response = await fetch(
+        `${pageOrigin()}/login/generate-temporary-token`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest',
+            Accept: 'application/json',
+          },
+          body,
+        },
+      );
+      if (!response.ok) return '';
+      const json = await response.json();
+      if (!json?.token) return '';
+      forumApiToken = String(json.token);
+      forumApiTokenExpiresAt = Number(json.expires || 0) * 1000 || Date.now() + 50 * 60_000;
+      return forumApiToken;
+    } catch {
+      return '';
+    }
+  })().finally(() => {
+    forumApiTokenPromise = null;
+  });
+  return forumApiTokenPromise;
+}
+
+function unfurlIconHtml(extra) {
+  const raw = String(extra?.active_icon_content || extra?.icon_content || extra?.icon || '&#xE000;');
+  const template = document.createElement('template');
+  template.innerHTML = raw;
+  template.content.querySelectorAll('script, style, iframe, foreignObject').forEach((node) => node.remove());
+  return template.innerHTML.slice(0, 2_000) || '&#xE000;';
+}
+
+function createMediaCard(url, data) {
+  const site = String(data?.media?.siteId || data?.extra?.siteId || '').toLowerCase();
+  if (!site) return null;
+  const card = document.createElement('span');
+  card.className = 'embed-link';
+  card.dataset.url = url;
+  card.dataset.mediaId = String(data?.media?.mediaId || data?.extra?.mediaId || url);
+  card.dataset.siteId = site;
+  const wrapper = document.createElement('span');
+  wrapper.className = 'embed-link-wrapper';
+  const icon = document.createElement('span');
+  icon.className = `mini_unfurl_icon ${site} embed-icon`;
+  const link = document.createElement('a');
+  link.className = 'internal-link';
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer nofollow';
+  link.setAttribute('ignore-opener', 'true');
+  link.setAttribute('data-ignore-popover', 'true');
+  link.textContent = UNFURL_LABELS[site] || site;
+  const visit = document.createElement('span');
+  visit.className = 'visit-icon';
+  wrapper.append(icon, link, visit);
+  card.appendChild(wrapper);
+  return card;
+}
+
+function createForumCardFromUnfurl(url, data) {
+  if (data?.type === 'node') {
+    const card = document.createElement('span');
+    card.className = 'unfurl-renderer';
+    card.dataset.title = String(data.title || '');
+    card.dataset.type = 'node';
+    card.dataset.extra = JSON.stringify(data.extra || {});
+    const link = document.createElement('a');
+    link.className = 'forum-wrapper';
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer nofollow';
+    const icon = document.createElement('span');
+    icon.className = 'forum-icon';
+    icon.innerHTML = unfurlIconHtml(data.extra);
+    const title = document.createElement('span');
+    title.className = 'forum-title';
+    title.textContent = String(data.title || '');
+    link.append(icon, title);
+    card.appendChild(link);
+    return card;
+  }
+  if (data?.type === 'media') return createMediaCard(url, data);
+  if (data?.title && ['thread', 'post', 'post_comment', 'market_item', 'market_feedback', 'market_search'].includes(String(data.type))) {
+    const card = document.createElement('span');
+    card.className = 'unfurl-renderer';
+    card.dataset.title = String(data.title);
+    card.dataset.type = String(data.type);
+    card.dataset.extra = JSON.stringify(data.extra || {});
+    const link = document.createElement('a');
+    link.className = 'unfurl-wrapper';
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer nofollow';
+    const content = document.createElement('span');
+    content.className = 'unfurl-content';
+    const title = document.createElement('span');
+    title.className = 'unfurlMarketTitle';
+    title.textContent = String(data.title);
+    content.appendChild(title);
+    link.appendChild(content);
+    card.appendChild(link);
+    return card;
+  }
+  return null;
+}
+
+async function fetchForumUnfurl(url, token) {
+  const csrf = getCsrfToken();
+  if (!csrf || !token) return null;
+  const body = new URLSearchParams();
+  body.append('url', url);
+  body.append('_xfRequestUri', location.pathname + location.search);
+  body.append('_xfNoRedirect', '1');
+  body.append('_xfToken', csrf);
+  body.append('_xfResponseType', 'json');
+  try {
+    const response = await fetch('https://api.lolz.team/editor/unfurl', {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body,
+      signal:
+        typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+          ? AbortSignal.timeout(6_000)
+          : undefined,
+    });
+    if (!response.ok) return null;
+    const json = await response.json();
+    return json && typeof json === 'object' ? json : null;
+  } catch {
+    return null;
+  }
+}
+
+function trimUrlPunctuation(raw) {
+  const match = raw.match(/[.,;:!?)\]]+$/);
+  if (!match) return { url: raw, trailing: '' };
+  return { url: raw.slice(0, -match[0].length), trailing: match[0] };
+}
+
+async function resolvePlainUnfurls(html) {
+  const template = document.createElement('template');
+  template.innerHTML = String(html || '');
+  if (!/https?:\/\//i.test(template.innerHTML)) return template.innerHTML;
+
+  // Tiptap sometimes serializes an autolink mark as <a>text</a> without href.
+  // Unwrap those so the normal URL pass can turn them into a native block.
+  for (const anchor of [...template.content.querySelectorAll('a:not([href])')]) {
+    if (anchor.closest('.mention, .unfurlContainer, .internalNodeLink, .node-unfurl, .node-media, .unfurl-renderer, .embed-link')) continue;
+    const text = (anchor.textContent || '').trim();
+    if (/^https?:\/\//i.test(text)) anchor.replaceWith(document.createTextNode(text));
+  }
+
+  const candidates = new Map();
+  const anchorEntries = [];
+  for (const anchor of [...template.content.querySelectorAll('a[href]')]) {
+    if (anchor.closest('.mention, .unfurlContainer, .internalNodeLink, .node-unfurl, .node-media, .unfurl-renderer, .embed-link, .LbTrigger')) continue;
+    const href = anchor.getAttribute('href') || '';
+    if (!/^https?:\/\//i.test(href)) continue;
+    candidates.set(href, href);
+    anchorEntries.push({ anchor, href });
+  }
+  const textEntries = [];
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (node.parentElement?.closest(AUTO_UNFURL_SKIP)) continue;
+    const text = node.nodeValue || '';
+    AUTO_URL_RE.lastIndex = 0;
+    let match;
+    const found = [];
+    while ((match = AUTO_URL_RE.exec(text))) {
+      const { url, trailing } = trimUrlPunctuation(match[0]);
+      if (!/^https?:\/\//i.test(url)) continue;
+      found.push({ raw: match[0], url, trailing, index: match.index });
+      candidates.set(url, url);
+    }
+    if (found.length) textEntries.push({ node, found });
+  }
+  if (!candidates.size) return template.innerHTML;
+
+  const token = await getForumApiToken();
+  if (!token) return template.innerHTML;
+  const urls = [...candidates.keys()].slice(0, 5);
+  const resolved = new Map();
+  await Promise.all(
+    urls.map(async (url) => {
+      const data = await fetchForumUnfurl(url, token);
+      const card = data ? createForumCardFromUnfurl(url, data) : null;
+      if (card) resolved.set(url, card);
+    }),
+  );
+  if (!resolved.size) return template.innerHTML;
+
+  for (const { anchor, href } of anchorEntries) {
+    const card = resolved.get(href);
+    if (card) anchor.replaceWith(card.cloneNode(true));
+  }
+  for (const { node, found } of textEntries) {
+    const text = node.nodeValue || '';
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+    for (const item of found) {
+      if (item.index > lastIndex) fragment.appendChild(document.createTextNode(text.slice(lastIndex, item.index)));
+      const card = resolved.get(item.url);
+      if (card) {
+        fragment.appendChild(card.cloneNode(true));
+        if (item.trailing) fragment.appendChild(document.createTextNode(item.trailing));
+      } else {
+        fragment.appendChild(document.createTextNode(item.raw));
+      }
+      lastIndex = item.index + item.raw.length;
+    }
+    if (lastIndex < text.length) fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+    node.parentNode?.replaceChild(fragment, node);
+  }
+  return template.innerHTML;
+}
+
 function getScrollElement() {
   const nativeMessages = getChatMessages() || els.nativeMessagesEl;
   const parent = nativeMessages?.parentElement;

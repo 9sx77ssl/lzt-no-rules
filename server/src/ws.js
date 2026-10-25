@@ -263,10 +263,6 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
       }
       throw error;
     }
-    if (limiters.duplicate.isDuplicate(`duplicate:${ws.user.id}`, sanitized.text)) {
-      throw new ClientError('duplicate', 'Такое сообщение уже отправлено', { clientId });
-    }
-
     const replyTo = data.replyTo == null ? null : safeInteger(data.replyTo);
     if (data.replyTo != null && replyTo == null) {
       throw new ClientError('invalid_reply', 'Некорректный ответ', { clientId });
@@ -612,7 +608,6 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
     for (const [userId, value] of typingState) {
       if (value.at < cutoff) typingState.delete(userId);
     }
-    limiters.duplicate.cleanup();
   }, 15_000);
   typingCleanup.unref?.();
 
