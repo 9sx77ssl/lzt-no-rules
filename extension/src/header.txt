@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Lolzteam Chatbox — No Rules
-// @namespace    https://lolz.team/gay1234
+// @namespace    https://lolz.team/no-rules
 // @version      __VERSION__
 // @description  Приватная комната No Rules внутри нативного Chatbox Lolzteam
 // @author       gay1234 (https://lolz.team/gay1234)

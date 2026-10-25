@@ -893,7 +893,7 @@ async function findForumUser(token) {
       body.append('_xfToken', csrf);
       body.append('_xfResponseType', 'json');
       const origin = PAGE_WINDOW?.location?.origin || location.origin;
-      const response = await fetch(new URL('/members/find', origin), {
+      const response = await fetch(new URL('/members/find', origin).href, {
         method: 'POST',
         credentials: 'include',
         headers: {

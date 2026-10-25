@@ -57,7 +57,7 @@ async function fetchTemporaryToken() {
     let response;
     try {
       const origin = PAGE_WINDOW?.location?.origin || location.origin;
-      response = await fetch(new URL('/login/generate-temporary-token', origin), {
+      response = await fetch(new URL('/login/generate-temporary-token', origin).href, {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',

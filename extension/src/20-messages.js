@@ -38,8 +38,15 @@ function scheduleRender(options = {}) {
 }
 
 function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
-  const container = els.messages || document.getElementById('no-rules-messages');
-  if (!container) return;
+  let container =
+    els.messages && els.messages.isConnected
+      ? els.messages
+      : document.getElementById('no-rules-messages');
+  if (!container) {
+    if (!state.active || !ensureMessagesContainer()) return;
+    container = els.messages || document.getElementById('no-rules-messages');
+    if (!container) return;
+  }
   els.messages = container;
   const scroll = getScrollElement();
   const previousTop = scroll?.scrollTop || 0;

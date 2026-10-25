@@ -330,9 +330,10 @@ function captureTemplates() {
 }
 
 function ensureMessagesContainer() {
-  const nativeMessages = getChatMessages() || state.nativeMessagesEl;
-  if (!nativeMessages || !nativeMessages.isConnected) return false;
-  state.nativeMessagesEl = nativeMessages;
+  const nativeMessages = getChatMessages();
+  const chatRoot = getChatRoot();
+  if (!chatRoot && !nativeMessages) return false;
+  if (nativeMessages?.isConnected) state.nativeMessagesEl = nativeMessages;
 
   if (!state.templates || state.templates.fallback) {
     captureTemplates();
@@ -346,7 +347,13 @@ function ensureMessagesContainer() {
     container.setAttribute('role', 'log');
     container.setAttribute('aria-live', 'polite');
     container.setAttribute('aria-relevant', 'additions');
-    nativeMessages.after(container);
+    if (nativeMessages?.isConnected) {
+      nativeMessages.after(container);
+    } else {
+      const footer = chatRoot?.querySelector('.chat2-footer');
+      if (footer) footer.before(container);
+      else chatRoot?.append(container);
+    }
     els.messages = container;
     installMessageListeners(container);
     renderMessages({ forceBottom: true });
@@ -354,7 +361,7 @@ function ensureMessagesContainer() {
     if (!container.classList.contains('chat2-messages')) {
       container.classList.add('chat2-messages', 'lztng-content-background', HASH.footer);
     }
-    if (container.previousElementSibling !== nativeMessages) {
+    if (nativeMessages?.isConnected && container.previousElementSibling !== nativeMessages) {
       nativeMessages.after(container);
     }
   }
