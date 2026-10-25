@@ -77,6 +77,42 @@ const NR_CSS = `
 }
 
 
+/* Native video messages need the same text/date layout before and after the
+   XenForo video player is mounted, otherwise the message jumps horizontally. */
+#no-rules-messages .chat2-message-text:has(video) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+#no-rules-messages .chat2-message-text:has(video) .chat2-message-text-inner {
+  flex: none;
+  max-width: 100%;
+}
+#no-rules-messages .chat2-message-text:has(video) .chat2-message-date {
+  align-self: flex-end;
+  margin-left: 0;
+}
+#no-rules-messages .chat2-message-text-inner > p > video {
+  display: block;
+  width: min(100%, 426px) !important;
+  max-width: 100%;
+  height: auto !important;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #000;
+}
+#no-rules-reply .chat2-replying-text video,
+.reply-message video {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: 120px;
+  border-radius: 8px;
+  background: #000;
+}
+#no-rules-editing .chat2-replying-text video { max-height: 120px; }
+
 /* Native unfurl renderer CSS lives inside the Tiptap lazy chunk. After a
    reload there may be no unfurl node in the composer, so the old messages
    would lose their forum/media card styling. Copy the native rules here. */
@@ -853,6 +889,7 @@ function enforceActiveUI() {
     updateUnreadBadge();
     updatePaused();
     updateConnectionError();
+    muteEditorVideos();
   } else {
     // While No Rules is inactive the native Svelte app owns this subtree and
     // re-renders it on every room switch. Keep our node out of its way instead
@@ -866,6 +903,7 @@ function enforceActiveUI() {
     updateRoomLinkActive();
     updatePaused();
     updateConnectionError();
+    muteEditorVideos();
   }
 }
 
@@ -1146,6 +1184,46 @@ function hydrateForumTitles(root) {
   }
 }
 
+
+function activateNativeContent(root) {
+  if (!root || !root.querySelector?.('video')) return;
+  const xf = PAGE_WINDOW?.XenForo || window.XenForo;
+  if (!xf || typeof xf.activate !== 'function') return;
+  try {
+    xf.activate(root);
+  } catch (error) {
+    console.debug('[NoRules:video] native activate failed', error);
+  }
+}
+
+function prepareReplyVideos(root) {
+  if (!root) return;
+  for (const video of root.querySelectorAll('video')) {
+    if (video.closest('[data-lzt-video-player]')) continue;
+    video.controls = true;
+    video.setAttribute('controls', '');
+    video.setAttribute('playsinline', '');
+    video.preload = 'metadata';
+    if (!video.getAttribute('poster')) {
+      const src = video.getAttribute('src') || video.querySelector('source')?.src || '';
+      if (/^https:\/\/nztcdn\.com\/files\//i.test(src)) {
+        video.setAttribute('poster', src.replace(/\.[^./?]+(?:\?.*)?$/, '.webp'));
+      }
+    }
+  }
+}
+
+function muteEditorVideos() {
+  const editor = getEditorElement();
+  if (!editor) return;
+  for (const video of editor.querySelectorAll('video')) {
+    if (!video.muted) video.muted = true;
+    video.defaultMuted = true;
+    video.setAttribute('muted', '');
+    video.setAttribute('playsinline', '');
+  }
+}
+
 function createMessageElement(message, { showHeader = true } = {}) {
   const wrapper = document.createElement('div');
   wrapper.dataset.messageId = String(message.id);
@@ -1205,6 +1283,7 @@ function createMessageElement(message, { showHeader = true } = {}) {
       text.innerHTML = enhanceUnfurls(message.reply.html);
       applyMentionHighlights(text);
       hydrateForumTitles(text);
+      prepareReplyVideos(text);
     } else {
       const paragraph = document.createElement('p');
       paragraph.textContent = message.reply.text || '[сообщение]';

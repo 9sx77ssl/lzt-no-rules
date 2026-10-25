@@ -102,6 +102,7 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
     }
   }
 
+  activateNativeContent(container);
   renderTypingInto(container);
 
   requestAnimationFrame(() => {
@@ -375,6 +376,7 @@ function renderReplyBar() {
     text.innerHTML = enhanceUnfurls(state.replyTo.html);
     applyMentionHighlights(text);
     hydrateForumTitles(text);
+    prepareReplyVideos(text);
   } else {
     const paragraph = document.createElement('p');
     paragraph.textContent = state.replyTo.text || '[вложение]';

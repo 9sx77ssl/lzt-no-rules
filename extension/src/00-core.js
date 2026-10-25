@@ -830,12 +830,14 @@ function setEditorHtml(html) {
   if (editor) {
     editor.commands.setContent(html || '');
     editor.commands.focus();
+    muteEditorVideos();
     return;
   }
   const element = getEditorElement();
   if (!element) return;
   element.innerHTML = html || '<p></p>';
   element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+  muteEditorVideos();
 }
 
 function insertEditorText(text) {
