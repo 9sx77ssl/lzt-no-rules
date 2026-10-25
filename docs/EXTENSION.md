@@ -84,7 +84,7 @@ bun scripts/build-extension.mjs
 - images/smilies:
   - `prepareLightboxImages`, `applySingleSmilie`;
 - market:
-  - `marketCardFor`, `hydrateMarketTitles`, `hydrateMarketCards`;
+  - `marketCardFor`, `hydrateForumTitles`, `hydrateMarketCards`;
 - native video player activation via `XenForo.activate`.
 
 ### `20-messages.js`

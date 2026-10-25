@@ -9,7 +9,14 @@ server/data/
 *.db-wal
 *.sqlite
 *.sqlite3
-research/
+# Сохраняем только JavaScript-чанки для реверса; сетевые дампы/DOM/antibot
+# могут содержать токены и cookies и остаются локально.
+research/*
+!research/README.md
+!research/chatbox/
+research/chatbox/*
+!research/chatbox/javascript/
+!research/chatbox/javascript/**
 .playwright-mcp/
 test-results/
 playwright-report/

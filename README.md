@@ -173,10 +173,11 @@ fancybox и XenForo video player.
     └── update.sh
 ```
 
-`research/` (если есть локально) содержит большие third-party bundles и
-сетевые дампы. Он **не коммитится** намеренно: это не исходники проекта, а
-материалы реверса, которые могут содержать токены/заголовки. Все полезные
-выводы перенесены в [NATIVE-CHATBOX.md](docs/NATIVE-CHATBOX.md).
+`research/chatbox/javascript/` содержит сохранённые third-party JS-чанки
+Chatbox, которые использовались для реверса. Сетевые дампы, DOM-снимки и
+antibot-файлы не коммитятся: в них могут быть токены/cookies. Все выводы
+перенесены в [NATIVE-CHATBOX.md](docs/NATIVE-CHATBOX.md), а сами чанки лежат
+в [research/README.md](research/README.md).
 
 ## Установка userscript
 
@@ -403,7 +404,7 @@ Playwright-сценарии (полный список — [docs/TESTING.md](doc
   notification при разрешении).
 - Нет полноценного XenForo BBCode-парсера (только перечисленные теги).
 - Нет Docker: production на systemd.
-- `research/` и Playwright storage state не коммитятся.
+- Сетевые дампы/DOM-снимки и Playwright storage state не коммитятся; JS-чанки для реверса — в `research/chatbox/javascript/`.
 
 ## Автор
 
