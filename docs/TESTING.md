@@ -97,6 +97,29 @@ Viewport 390×844, `isMobile: true`, `hasTouch: true`, Android UA.
 Ожидаемо: только нативный шум push-notification в console, ошибок
 `pageerror` нет.
 
+## 6.1. Плавающее окно (widget)
+
+На любой странице форума нажать `.chat2-button` справа снизу. Скрипт должен
+инициализироваться уже после открытия виджета (а не только на `/chatbox/`).
+Проверить: `state.chatRoot === 'widget'`, ссылка No Rules в боковом меню,
+отправка/меню/reply, закрытие и повторное открытие с восстановлением
+активной комнаты, URL страницы не меняется.
+
+## 6.2. Онлайн-модалка
+
+Активировать No Rules, кликнуть «Онлайн: N». Ожидается XenForo-модалка
+«Сейчас сидят в чате» с `top-user-item lztng-yzgsen`, аватарами 48×48 и
+никами только участников No Rules. Проверить закрытие по X, backdrop и
+Escape.
+
+## 6.3. Typing
+
+`window.__noRulesChat.simulateTyping('user')` — внизу `#no-rules-messages`
+должен появиться `chat2-typingDetails` с тремя `lztui-spinner-bounce`
+(6×6, `animation-name: sk-bouncedelay`) и текстом «user печатает».
+Высота блока 23 px + `margin-top: 8px`; сообщения не должны прилипать к
+полю ввода.
+
 ## 7. Lifecycle: hash, refresh, reconnect, offline
 
 1. Открыть `https://lolz.team/chatbox/#no-rules` с чистым контекстом.

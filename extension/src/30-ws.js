@@ -1,3 +1,5 @@
+/* WebSocket transport: forum temporary-token auth, opaque session resume,
+ * heartbeat/reconnect, history sync and the offline outbox. */
 class AuthFlowError extends Error {
   constructor(message, { code = 'auth_flow', retryAfterMs = 0, permanent = false } = {}) {
     super(message);
@@ -322,6 +324,7 @@ function handleSocketMessage(payload) {
 
     case 'presence':
       state.online = Math.max(0, Number(payload.online) || 0);
+      state.onlineUsers = Array.isArray(payload.users) ? payload.users : [];
       updateOnline();
       updateUnreadBadge();
       if (state.active) updateHeader();
@@ -384,6 +387,7 @@ function handleAuthOk(payload) {
   state.user = user;
   state.wsAuthenticated = true;
   state.online = Math.max(0, Number(payload.online) || 0);
+  state.onlineUsers = Array.isArray(payload.users) ? payload.users : [];
   state.reconnectAttempt = 0;
   state.tokenRetryCount = 0;
   state.forceTokenOnReconnect = false;
@@ -584,6 +588,8 @@ function disconnectNoRules({ clear = false } = {}) {
     clearSession();
     state.user = null;
     state.messages.clear();
+    state.deletedIds.clear();
+    state.onlineUsers = [];
     state.pending.clear();
     state.outbox = [];
     state.typing.clear();

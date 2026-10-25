@@ -1,45 +1,32 @@
+/* Native DOM templates, CSS and overlays. All visual primitives are copied
+ * from the forum's Svelte Chatbox; custom CSS is limited to states the native
+ * UI does not expose (connection errors, toasts, unread badge). */
 const DEFAULT_AVATAR = 'https://lolz.team/styles/default/xenforo/avatars/avatar_s.png';
 
 const NR_ICONS = {
   reply:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20.7914 12.6072C21.0355 12.398 21.1575 12.2933 21.2023 12.1688C21.2415 12.0596 21.2415 11.94 21.2023 11.8308C21.1575 11.7063 21.0355 11.6016 20.7914 11.3924L12.3206 4.13178C11.9004 3.77158 11.6903 3.59148 11.5124 3.58707C11.3578 3.58323 11.2101 3.65115 11.1124 3.77103C11 3.90897 11 4.18571 11 4.73918V9.03444C8.86532 9.40789 6.91159 10.4896 5.45971 12.1137C3.87682 13.8843 3.00123 16.1757 3 18.5508V19.1628C4.04934 17.8987 5.35951 16.8763 6.84076 16.1657C8.1467 15.5392 9.55842 15.1681 11 15.0703V19.2604C11 19.8139 11 20.0906 11.1124 20.2286C11.2101 20.3485 11.3578 20.4164 11.5124 20.4125C11.6903 20.4081 11.9004 20.228 12.3206 19.8678L20.7914 12.6072Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M20.7914 12.6072C21.0355 12.398 21.1575 12.2933 21.2023 12.1688C21.2415 12.0596 21.2415 11.94 21.2023 11.8308C21.1575 11.7063 21.0355 11.6016 20.7914 11.3924L12.3206 4.13178C11.9004 3.77158 11.6903 3.59148 11.5124 3.58707C11.3578 3.58323 11.2101 3.65115 11.1124 3.77103C11 3.90897 11 4.18571 11 4.73918V9.03444C8.86532 9.40789 6.91159 10.4896 5.45971 12.1137C3.87682 13.8843 3.00123 16.1757 3 18.5508V19.1628C4.04934 17.8987 5.35951 16.8763 6.84076 16.1657C8.1467 15.5392 9.55842 15.1681 11 15.0703V19.2604C11 19.8139 11 20.0906 11.1124 20.2286C11.2101 20.3485 11.3578 20.4164 11.5124 20.4125C11.6903 20.4081 11.9004 20.228 12.3206 19.8678L20.7914 12.6072Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  replyBar:
+    '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M13.6627 3.13951C13.3696 2.77988 12.9266 2.57612 12.4628 2.58762C12.0562 2.59771 11.7491 2.80148 11.5945 2.91154C11.4297 3.02886 11.242 3.18975 11.0559 3.34931C11.0468 3.35713 11.0377 3.36495 11.0286 3.37276L2.53823 10.6502C2.43379 10.7396 2.31247 10.8436 2.21475 10.9431C2.10412 11.0558 1.94933 11.2348 1.85662 11.4929C1.73886 11.8208 1.73886 12.1793 1.85662 12.5072C1.94933 12.7653 2.10412 12.9443 2.21475 13.057C2.31247 13.1565 2.43379 13.2604 2.53823 13.3499L11.056 20.6508C11.242 20.8104 11.4297 20.9712 11.5945 21.0886C11.7491 21.1986 12.0562 21.4024 12.4628 21.4125C12.9266 21.424 13.3696 21.2202 13.6627 20.8606C13.9197 20.5453 13.9648 20.1795 13.9819 19.9905C14.0001 19.789 14 19.5418 14 19.2967L14 16.1964C14.9422 16.3593 15.86 16.6518 16.7267 17.0676C18.078 17.7158 19.2733 18.6485 20.2306 19.8017C20.4997 20.1259 20.9432 20.2467 21.3395 20.1036C21.7359 19.9605 22 19.5844 22 19.163V18.551C21.9986 15.9303 21.0325 13.4013 19.2858 11.4474C17.8734 9.86748 16.0306 8.75275 14 8.22857V4.73942C14 4.72743 14 4.71542 14 4.7034C14 4.45828 14.0001 4.2111 13.9819 4.00958C13.9648 3.82055 13.9197 3.45479 13.6627 3.13951Z"/></svg>',
   mention:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M16 12C16 14.2091 14.2091 16 12 16C9.79086 16 8 14.2091 8 12C8 9.79086 9.79086 8 12 8C14.2091 8 16 9.79086 16 12ZM16 12V13.5C16 14.8807 17.1193 16 18.5 16C19.8807 16 21 14.8807 21 13.5V12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21C13.8286 21 15.5264 20.4519 16.9291 19.5052" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   copy:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3" stroke="currentColor" stroke-width="2"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M7.5 3H14.6C16.8402 3 17.9603 3 18.816 3.43597C19.5686 3.81947 20.1805 4.43139 20.564 5.18404C21 6.03969 21 7.15979 21 9.4V16.5M6.2 21H14.3C15.4201 21 15.9802 21 16.408 20.782C16.7843 20.5903 17.0903 20.2843 17.282 19.908C17.5 19.4802 17.5 18.9201 17.5 17.8V9.7C17.5 8.57989 17.5 8.01984 17.282 7.59202C17.0903 7.21569 16.7843 6.90973 16.408 6.71799C15.9802 6.5 15.4201 6.5 14.3 6.5H6.2C5.0799 6.5 4.51984 6.5 4.09202 6.71799C3.71569 6.90973 3.40973 7.21569 3.21799 7.59202C3 8.01984 3 8.57989 3 9.7V17.8C3 18.9201 3 19.4802 3.21799 19.908C3.40973 20.2843 3.71569 20.5903 4.09202 20.782C4.51984 21 5.0799 21 6.2 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   edit:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="m4 20 4.2-1 10.6-10.6a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m13.5 6.5 3 3" stroke="currentColor" stroke-width="2"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M11 4.00023H6.8C5.11984 4.00023 4.27976 4.00023 3.63803 4.32721C3.07354 4.61483 2.6146 5.07377 2.32698 5.63826C2 6.27999 2 7.12007 2 8.80023V17.2002C2 18.8804 2 19.7205 2.32698 20.3622C2.6146 20.9267 3.07354 21.3856 3.63803 21.6732C4.27976 22.0002 5.11984 22.0002 6.8 22.0002H15.2C16.8802 22.0002 17.7202 22.0002 18.362 21.6732C18.9265 21.3856 19.3854 20.9267 19.673 20.3622C20 19.7205 20 18.8804 20 17.2002V13.0002M7.99997 16.0002H9.67452C10.1637 16.0002 10.4083 16.0002 10.6385 15.945C10.8425 15.896 11.0376 15.8152 11.2166 15.7055C11.4184 15.5818 11.5914 15.4089 11.9373 15.063L21.5 5.50023C22.3284 4.6718 22.3284 3.32865 21.5 2.50023C20.6716 1.6718 19.3284 1.6718 18.5 2.50022L8.93723 12.063C8.59133 12.4089 8.41838 12.5818 8.29469 12.7837C8.18504 12.9626 8.10423 13.1577 8.05523 13.3618C7.99997 13.5919 7.99997 13.8365 7.99997 14.3257V16.0002Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   delete:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 3H15M3 6H21M19 6L18.2987 16.5193C18.1935 18.0975 18.1409 18.8867 17.8 19.485C17.4999 20.0118 17.0472 20.4353 16.5017 20.6997C15.882 21 15.0911 21 13.5093 21H10.4907C8.90891 21 8.11803 21 7.49834 20.6997C6.95276 20.4353 6.50009 20.0118 6.19998 19.485C5.85911 18.8867 5.8065 18.0975 5.70129 16.5193L5 6M10 10.5V15.5M14 10.5V15.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   external:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M14 4h6v6M20 4l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" stroke="currentColor" stroke-width="2"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M14 4h6v6M20 4l-9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5" stroke="currentColor" stroke-width="2"/></svg>',
   link:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
   select:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 9-6 1-3 6L5 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 3l14 9-6 1-3 6L5 3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>',
   retry:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M20 11a8 8 0 1 0-2.3 6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 4v7h-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M20 11a8 8 0 1 0-2.3 6.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 4v7h-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
-
 const NR_CSS = `
-#no-rules-messages {
-  padding: 10px 20px 0 20px;
-  box-sizing: border-box;
-}
 #no-rules-messages.nr-hidden { display: none !important; }
-#no-rules-messages .nr-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 180px;
-  color: var(--mutedTextColor, #8c8c8c);
-  text-align: center;
-  user-select: none;
-}
-#no-rules-messages .nr-empty i { font-size: 28px; opacity: .65; }
-#no-rules-messages .nr-empty .nr-empty-title { color: var(--contentText, #d6d6d6); font-weight: 600; }
 #no-rules-messages .nr-connection-banner {
   display: flex;
   align-items: flex-start;
@@ -64,72 +51,9 @@ const NR_CSS = `
   font-size: 12px;
 }
 #no-rules-messages .nr-loading-top i { margin-right: 6px; }
-#no-rules-messages .chat2-message-group { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; }
-#no-rules-messages .chat2-message-group-content { flex: 1; min-width: 0; }
-#no-rules-messages .chat2-group-avatar {
-  position: sticky;
-  bottom: 8px;
-  width: 35px;
-  height: 35px;
-  flex-shrink: 0;
-  cursor: pointer;
-  align-self: flex-end;
-  margin-top: 4px;
-  border-radius: 50%;
-}
-#no-rules-messages .chat2-group-avatar img { width: 35px; height: 35px; border-radius: 50%; display: block; }
-#no-rules-messages .chat2-message-block {
-  border-radius: 13px;
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  position: relative;
-}
-#no-rules-messages .chat2-message-header { display: flex; margin-bottom: 4px; }
-#no-rules-messages .chat2-message-text { width: 100%; box-sizing: border-box; display: flex; justify-content: space-between; gap: 10px; }
-#no-rules-messages .chat2-message-text:has(.LbTrigger) { flex-direction: column; }
-#no-rules-messages .chat2-message-text-inner { word-break: break-word; overflow: hidden; min-width: 0; }
-#no-rules-messages .reply-message {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px;
-  padding: 4px 8px;
-  margin-bottom: 5px;
-  border-left: 3px solid var(--primary, #2a6a4a);
-  border-radius: 6px;
-  background: rgba(11, 80, 49, .18);
-  font-size: 12px;
-  line-height: 1.35;
-  cursor: pointer;
-  overflow: hidden;
-}
-#no-rules-messages .reply-message.reply-message-your { background: linear-gradient(90deg, rgb(11, 80, 49) 0%, var(--primaryLighter, #153a2a) 100%) !important; }
-#no-rules-messages .chat2-reply-text-label { font-weight: 700; white-space: nowrap; }
-#no-rules-messages .chat2-reply-text { color: var(--mutedTextColor, #9a9a9a); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-#no-rules-messages .chat2-reply-text p { margin: 0; }
-#no-rules-messages .chat2-day-separator {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  color: var(--mutedTextColor, #8c8c8c);
-  padding: 10px 0;
-  font-size: 12px;
-}
-#no-rules-messages .chat2-day-separator::before,
-#no-rules-messages .chat2-day-separator::after { content: ''; flex: 1; border-bottom: 1px solid var(--primary, #2a2a2a); }
-#no-rules-messages .chat2-day-separator::before { margin-right: .25em; }
-#no-rules-messages .chat2-day-separator::after { margin-left: .25em; }
-#no-rules-messages .chat2-message-tagged .chat2-message-block {
-  background: #0b503157;
-  box-shadow: 0 0 0 1px inset #0b5031b0;
-}
 #no-rules-messages .nr-message-pending { opacity: .7; }
 #no-rules-messages .nr-message-pending.nr-failed { opacity: 1; }
-#no-rules-messages .nr-message-deleting { opacity: .45; pointer-events: none; }
 #no-rules-messages .nr-failed .chat2-message-block { box-shadow: 0 0 0 1px inset #ff6a708f; }
-#no-rules-messages .nr-message-deleted { opacity: .72; }
 #no-rules-messages .nr-retry {
   color: #ff8b8f;
   cursor: pointer;
@@ -140,8 +64,6 @@ const NR_CSS = `
 #no-rules-messages .nr-retry:hover { text-decoration: underline; }
 #no-rules-messages .nr-highlight .chat2-message-block { box-shadow: 0 0 0 2px var(--primaryMedium, #2f8a5d); transition: box-shadow .2s ease; }
 #no-rules-messages .nr-swipe { transform: translateX(8px); transition: transform .12s ease; }
-#no-rules-messages .chat2-typingDetails { color: var(--mutedTextColor, #8c8c8c); min-height: 18px; display: flex; align-items: center; padding: 0 0 5px 0; gap: 5px; user-select: none; margin-top: 8px; }
-#no-rules-messages .chat2-typingUsers { display: block; width: 100%; }
 
 .nr-toast {
   position: fixed;
@@ -166,58 +88,7 @@ const NR_CSS = `
 .nr-toast[data-type="error"] { border-color: #ff6a70; color: #ffc0c2; }
 .nr-toast[data-type="success"] { border-color: #2f8a5d; color: #b6e7ce; }
 
-.nr-menu {
-  position: fixed;
-  z-index: 2147483000;
-  min-width: 200px;
-  max-width: 260px;
-  overflow: hidden;
-  border: 1px solid var(--primary, #2a2a2a);
-  border-radius: 8px;
-  background: var(--primaryDarker, #141918);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, .45);
-}
-.nr-menu .menu { list-style: none; margin: 0; padding: 4px; }
-.nr-menu .action {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 11px;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--contentText, #d6d6d6);
-  font-size: 13px;
-  line-height: 1.2;
-  user-select: none;
-}
-.nr-menu .action:hover { background: var(--primaryDark, #1b211f); }
-.nr-menu .action.nr-danger { color: #ff8b8f; }
-.nr-menu .Svg-Icon { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: .85; }
-.nr-menu .Svg-Icon svg { width: 20px; height: 20px; }
-.nr-menu .nr-menu-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.nr-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, .58);
-  z-index: 2147483000;
-}
-.nr-modal {
-  width: min(380px, 100%);
-  border: 1px solid var(--primary, #2a2a2a);
-  border-radius: 10px;
-  padding: 20px;
-  background: var(--contentBackground, #111615);
-  color: var(--contentText, #d6d6d6);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, .5);
-}
-.nr-modal-title { font-weight: 700; font-size: 15px; margin-bottom: 8px; }
-.nr-modal-text { color: var(--mutedTextColor, #8c8c8c); font-size: 13px; line-height: 1.45; margin-bottom: 18px; }
-.nr-modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+#no-rules-paused[hidden] { display: none !important; }
 
 .nr-room-unread {
   display: inline-flex;
@@ -237,85 +108,118 @@ const NR_CSS = `
 }
 .nr-room-unread[hidden] { display: none !important; }
 
-#no-rules-reply {
+/* Native message-actions CSS is a lazily injected Svelte chunk; copy it so the
+   menu is identical in the full chat and in the floating widget. */
+.message-actions.${HASH.menu} { width: 230px; height: auto; }
+.menu.${HASH.menu} {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  justify-content: center;
+  background-color: var(--contentBackground);
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  padding: 8px;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 0 5px 26px 0 rgb(0 0 0 / 0.32);
+}
+.menu.${HASH.menu} .action.${HASH.menu} {
+  width: auto;
+  padding: 8px 12px;
   display: flex;
   flex-direction: row;
-  background: var(--primaryDark, #1b211f);
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 16px;
   align-items: center;
-  position: relative;
-}
-#no-rules-reply .svg-icon-reply svg { fill: var(--mutedTextColor, #8c8c8c); width: 20px; height: 20px; }
-#no-rules-reply .chat2-replying-container { display: flex; flex-direction: column; gap: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-#no-rules-reply .chat2-replying-author { font-weight: 600; color: var(--contentText, #d6d6d6); }
-#no-rules-reply .chat2-replying-text { color: var(--mutedTextColor, #8c8c8c); line-height: 150%; word-break: break-all; overflow: hidden; text-overflow: ellipsis; }
-#no-rules-reply .chat2-cancel-reply { margin-left: auto; flex-shrink: 0; }
-#no-rules-reply .chat2-cancel-reply:not([class*="lztng-"]) {
-  width: 18px;
-  height: 18px;
-  display: inline-block;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24' stroke='rgb(214,214,214)' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E");
-  background-size: 100%;
-  opacity: .65;
   cursor: pointer;
-}
-#no-rules-reply .chat2-cancel-reply:not([class*="lztng-"]):hover { opacity: 1; }
-
-#no-rules-editing {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--primaryDark, #1b211f);
-  color: var(--contentText, #d6d6d6);
-  font-size: 13px;
-  border-bottom: 1px solid var(--primary, #2a2a2a);
-}
-#no-rules-editing .chat2-cancel-editing { margin-left: auto; }
-#no-rules-editing .chat2-cancel-editing:not([class*="lztng-"]) {
-  width: 15px;
-  height: 15px;
-  display: block;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24' stroke='rgb(148,148,148)' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'/%3E%3Cline x1='6' y1='6' x2='18' y2='18'/%3E%3C/svg%3E");
-  background-size: 100%;
-  cursor: pointer;
-}
-#no-rules-editing .chat2-cancel-editing:not([class*="lztng-"])::before { content: none; }
-
-#no-rules-paused {
-  position: absolute;
-  right: 16%;
-  left: 16%;
-  bottom: 0;
-  margin-bottom: 10px;
-  z-index: 101;
-}
-#no-rules-paused[hidden] { display: none !important; }
-#no-rules-paused .chat2-paused-button {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--primaryDark, #1b211f);
-  color: var(--contentText, #d6d6d6);
-  border: 1px solid var(--primary, #2a2a2a);
-  padding: 0 15px;
-  cursor: pointer;
-  font-size: 12px;
+  user-select: none;
   font-weight: 600;
+  -webkit-tap-highlight-color: transparent;
 }
-#no-rules-paused .chat2-paused-text { width: 100%; text-align: center; }
-#no-rules-paused .chat2-paused-icon { display: inline-flex; align-items: center; justify-content: center; margin-left: 8px; }
+.menu.${HASH.menu} .action.${HASH.menu}:hover {
+  background-color: var(--primaryDarker);
+  border-radius: 4px;
+}
+.menu.${HASH.menu} .action.${HASH.menu}:active { color: var(--textCtrlBackground); }
+.menu.${HASH.menu} .action.${HASH.menu} .Svg-Icon.${HASH.menu} {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.menu.${HASH.menu} .action.${HASH.menu} .Svg-Icon.${HASH.menu} svg.${HASH.menu} {
+  width: 20px;
+  height: 20px;
+  color: var(--mutedTextColorStill);
+}
+.menu.${HASH.menu} .action.${HASH.menu}:hover .Svg-Icon.${HASH.menu} svg.${HASH.menu} {
+  color: var(--primaryLighter);
+}
+.message-actions.${HASH.menu}[data-popper-reference-hidden] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 
-@media (max-width: 700px) {
-  #no-rules-messages { padding: 8px 10px 0 10px; }
-  #no-rules-paused { left: 8%; right: 8%; }
-  .nr-menu { min-width: 190px; max-width: 230px; }
-  #no-rules-messages .chat2-message-block { padding: 7px 10px; }
+/* Spinner/bounce styles are also a lazy chunk; typing must work in the widget. */
+.lztui-spinner-wrapper.${HASH.spinner} { display: inline-block; }
+.lztui-spinner-full.lztui-spinner-wrapper.${HASH.spinner} { display: flex; align-items: center; }
+.lztui-spinner.${HASH.spinner} { display: flex; align-items: center; justify-content: center; }
+.lztui-spinner-bounce.${HASH.spinner} {
+  animation: sk-bouncedelay 1.4s infinite ease-in-out both;
+  background-color: #454545;
+  border-radius: 100%;
+  display: inline-block;
+  transform-origin: center bottom;
+}
+.lztui-spinner-small.${HASH.spinner} .lztui-spinner-bounce.${HASH.spinner} {
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+}
+.lztui-spinner-bounce1.${HASH.spinner} { animation-delay: -0.32s; }
+.lztui-spinner-bounce2.${HASH.spinner} { animation-delay: -0.16s; }
+@keyframes sk-bouncedelay {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* Native online-users modal CSS is a lazily injected chunk. */
+.not-users.${HASH.online} { padding: 16px 20px; }
+.user-stats-block.${HASH.online} { display: flex; flex-direction: column; gap: 12px; }
+.user-stats-block.${HASH.online} .row.${HASH.online} {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+.user-abour-container.${HASH.online} { display: flex; flex-direction: row; gap: 16px; }
+.user-abour-container.${HASH.online} img.${HASH.online} {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+.top-user-item.${HASH.online} {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  padding: 16px 20px;
+  justify-content: space-between;
+}
+.top-user-item.${HASH.online}:not(:last-child) { border-bottom: 1px solid var(--primary); }
+.user-stats-block.${HASH.online} .row.${HASH.online} .counter.${HASH.online} .count.${HASH.online} { font-weight: bold; }
+.user-stats-block.${HASH.online} .row.${HASH.online} .counter.${HASH.online} {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.user-stats-block.${HASH.online} .row.${HASH.online} .counter.${HASH.online} .svg-icon.${HASH.online} svg.${HASH.online} {
+  width: 22px;
+  height: 22px;
+  fill: #8c8c8c;
+}
+.user-stats-block.${HASH.online} .row.${HASH.online} .counter.${HASH.online} .svg-icon.${HASH.online} { display: flex; }
+@media (max-width: 420px) {
+  .top-user-item.${HASH.online} { flex-direction: column; align-items: flex-start; }
 }
 `;
 
@@ -349,9 +253,7 @@ function injectStyles() {
 }
 
 function captureTemplates() {
-  const nativeMessages = document.querySelector(
-    '.chat2-full-inner .chat2-messages:not(#no-rules-messages)',
-  );
+  const nativeMessages = getChatMessages();
   const nativeGroup = nativeMessages?.querySelector('.chat2-message-group');
   const nativeMessage = nativeGroup?.querySelector('.chat2-message') || nativeMessages?.querySelector('.chat2-message');
   const nativeBlock = nativeMessage?.querySelector('.chat2-message-block');
@@ -365,7 +267,7 @@ function captureTemplates() {
   const nativeInner = nativeMessage?.querySelector('.chat2-message-text-inner');
   const nativeDate = nativeMessage?.querySelector('.chat2-message-date');
   const nativeDay = nativeMessages?.querySelector('.chat2-day-separator');
-  const nativeSocket = document.querySelector('.chat2-full-inner .chat2-socket-state');
+  const nativeSocket = getChatRoot()?.querySelector('.chat2-socket-state');
   const nativeSocketInner = nativeSocket?.querySelector('div');
   const nativeFooter = document.querySelector('.chat2-footer');
 
@@ -379,6 +281,10 @@ function captureTemplates() {
 
   state.templates = {
     fallback,
+    messages: classOf(
+      nativeMessages,
+      `chat2-messages lztng-content-background ${HASH.footer}`,
+    ),
     group: classOf(nativeGroup, `chat2-message-group ${HASH.footer}`),
     groupContent: classOf(nativeGroupContent, `chat2-message-group-content ${HASH.footer}`),
     avatar: stripClassNames(
@@ -417,7 +323,7 @@ function captureTemplates() {
     pausedButton: `chat2-paused-button ${HASH.paused}`,
     pausedText: `chat2-paused-text ${HASH.paused}`,
     pausedIcon: `chat2-paused-icon ${HASH.paused}`,
-    menu: `message-actions nr-menu ${HASH.menu}`,
+    menu: `message-actions ${HASH.menu}`,
     menuList: `menu ${HASH.menu}`,
     menuAction: `action ${HASH.menu}`,
     menuIcon: `Svg-Icon ${HASH.menu}`,
@@ -438,9 +344,7 @@ function captureTemplates() {
 }
 
 function ensureMessagesContainer() {
-  const nativeMessages =
-    document.querySelector('.chat2-full-inner .chat2-messages:not(#no-rules-messages)') ||
-    state.nativeMessagesEl;
+  const nativeMessages = getChatMessages() || state.nativeMessagesEl;
   if (!nativeMessages || !nativeMessages.isConnected) return false;
   state.nativeMessagesEl = nativeMessages;
 
@@ -452,7 +356,7 @@ function ensureMessagesContainer() {
   if (!container || !container.isConnected) {
     container = document.createElement('div');
     container.id = 'no-rules-messages';
-    container.className = 'no-rules-messages nr-hidden';
+    container.className = `${state.templates?.messages || `chat2-messages lztng-content-background ${HASH.footer}`} nr-hidden`;
     container.setAttribute('role', 'log');
     container.setAttribute('aria-live', 'polite');
     container.setAttribute('aria-relevant', 'additions');
@@ -460,8 +364,13 @@ function ensureMessagesContainer() {
     els.messages = container;
     installMessageListeners(container);
     renderMessages({ forceBottom: true });
-  } else if (container.previousElementSibling !== nativeMessages) {
-    nativeMessages.after(container);
+  } else {
+    if (!container.classList.contains('chat2-messages')) {
+      container.classList.add('chat2-messages', 'lztng-content-background', HASH.footer);
+    }
+    if (container.previousElementSibling !== nativeMessages) {
+      nativeMessages.after(container);
+    }
   }
   els.messages = container;
   attachScrollListener();
@@ -532,15 +441,13 @@ function ensureRoomLink() {
 }
 
 function hideNativeForRoom() {
-  const nativeMessages = document.querySelector(
-    '.chat2-full-inner .chat2-messages:not(#no-rules-messages)',
-  );
+  const nativeMessages = getChatMessages();
   if (!nativeMessages) return;
   state.nativeMessagesEl = nativeMessages;
   const candidates = [
     nativeMessages,
     ...document.querySelectorAll(
-      '.chat2-full-inner .chat2-prevmessages-loading, .chat2-full-inner .chat2-messages-loading, .chat2-full-inner .chat2-paused:not(#no-rules-paused)',
+      '.chat2-prevmessages-loading, .chat2-messages-loading, .chat2-paused:not(#no-rules-paused)',
     ),
   ];
   for (const element of candidates) {
@@ -563,7 +470,7 @@ function showNativeForRoom() {
 
 function ensureSocketIndicator() {
   if (!state.active) return;
-  const roomTitle = document.querySelector('.chat2-full-inner .room-title');
+  const roomTitle = getChatRoot()?.querySelector('.room-title');
   if (!roomTitle) return;
   const nativeSocket = roomTitle.querySelector('.chat2-socket-state');
   let socket = roomTitle.querySelector('#no-rules-socket');
@@ -605,8 +512,9 @@ function updateSocketIndicator() {
 }
 
 function updateHeader() {
-  const roomTitle = document.querySelector('.chat2-full-inner .room-title');
-  const roomOnline = document.querySelector('.chat2-full-inner .roomTitleBlock > .roomOnline');
+  const root = getChatRoot();
+  const roomTitle = root?.querySelector('.room-title');
+  const roomOnline = root?.querySelector('.roomTitleBlock > .roomOnline');
   if (!roomTitle) return;
   const titleSpan = roomTitle.querySelector(
     ':scope > span:not(.chat2-socket-state):not(#no-rules-socket)',
@@ -660,7 +568,7 @@ function updateUnreadBadge() {
 
 function updateOnline() {
   const onlineText = `Онлайн: ${Number(state.online) || 0}`;
-  const roomOnline = document.querySelector('.chat2-full-inner .roomTitleBlock > .roomOnline');
+  const roomOnline = getChatRoot()?.querySelector('.roomTitleBlock > .roomOnline');
   if (state.active && roomOnline && roomOnline.textContent !== onlineText) {
     roomOnline.textContent = onlineText;
   }
@@ -671,6 +579,87 @@ function updateOnline() {
       if (linkOnline.innerHTML.trim() !== markup) linkOnline.innerHTML = markup;
     }
   }
+}
+
+function closeOnlineModal() {
+  document.getElementById('no-rules-online-overlay')?.remove();
+  document.getElementById('no-rules-online-backdrop')?.remove();
+  document.removeEventListener('keydown', onOnlineModalKeydown, true);
+}
+
+function onOnlineModalKeydown(event) {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeOnlineModal();
+  }
+}
+
+function openOnlineModal() {
+  closeOnlineModal();
+  const modal = document.createElement('div');
+  modal.id = 'no-rules-online-overlay';
+  modal.className = 'modal fade in';
+  modal.dataset.zIndex = '10007';
+  modal.style.zIndex = '10007';
+  modal.tabIndex = -1;
+  modal.innerHTML = `<div class="xenOverlay" style="top: 10%;"><a class="close OverlayCloser"></a><div class="sectionMain"><h2 class="heading h1">Сейчас сидят в чате</h2><div class="helper"><div class="top-users-container"><div class="top-users-block"></div></div></div></div></div>`;
+
+  const block = modal.querySelector('.top-users-block');
+  const users = [...(state.onlineUsers || [])].sort((a, b) =>
+    String(a.username || '').localeCompare(String(b.username || ''), 'ru'),
+  );
+  if (!users.length) {
+    const empty = document.createElement('div');
+    empty.className = 'muted';
+    empty.textContent = 'В комнате пока никого нет';
+    block.appendChild(empty);
+  } else {
+    for (const user of users) {
+      const item = document.createElement('div');
+      item.className = `top-user-item ${HASH.online}`;
+      const profile = document.createElement('div');
+      profile.className = `user-abour-container ${HASH.online}`;
+      const img = document.createElement('img');
+      img.className = HASH.online;
+      img.loading = 'lazy';
+      img.alt = user.username || '';
+      img.src = user.avatar || DEFAULT_AVATAR;
+      img.addEventListener('error', () => {
+        if (img.src !== DEFAULT_AVATAR) img.src = DEFAULT_AVATAR;
+      });
+      const stats = document.createElement('div');
+      stats.className = `user-stats-block ${HASH.online}`;
+      const usernameStatus = document.createElement('div');
+      usernameStatus.className = 'username-status';
+      const link = document.createElement('a');
+      link.className = `username poster ${HASH.username}`;
+      link.href = user.profileUrl || `https://lolz.team/members/${user.id}/`;
+      let html = user.usernameHtml || `<span class="styleUserNickname">${escapeHtml(user.username || 'unknown')}</span>`;
+      html = sanitizeClientHtml(html);
+      link.innerHTML = html || `<span class="styleUserNickname">${escapeHtml(user.username || 'unknown')}</span>`;
+      usernameStatus.appendChild(link);
+      stats.appendChild(usernameStatus);
+      profile.appendChild(img);
+      profile.appendChild(stats);
+      item.appendChild(profile);
+      block.appendChild(item);
+    }
+  }
+
+  const backdrop = document.createElement('div');
+  backdrop.id = 'no-rules-online-backdrop';
+  backdrop.className = 'modal-backdrop fade in';
+  backdrop.style.zIndex = '10006';
+  const close = (event) => {
+    event.preventDefault();
+    closeOnlineModal();
+  };
+  modal.querySelector('.OverlayCloser')?.addEventListener('click', close);
+  backdrop.addEventListener('click', close);
+  document.body.appendChild(backdrop);
+  document.body.appendChild(modal);
+  document.addEventListener('keydown', onOnlineModalKeydown, true);
+  setTimeout(() => modal.querySelector('.OverlayCloser')?.focus(), 0);
 }
 
 function updatePaused() {
@@ -689,7 +678,7 @@ function updatePaused() {
       updatePaused();
       scrollToBottom('smooth');
     });
-    const host = document.querySelector('.chat2-full-inner') || document.body;
+    const host = getChatRoot() || document.body;
     host.appendChild(paused);
   }
   const text = paused.querySelector('.chat2-paused-text span');
@@ -700,9 +689,7 @@ function updatePaused() {
 
 function enforceActiveUI() {
   if (!state.initialized) return;
-  const nativeMessages = document.querySelector(
-    '.chat2-full-inner .chat2-messages:not(#no-rules-messages)',
-  );
+  const nativeMessages = getChatMessages();
   if (state.active) {
     ensureMessagesContainer();
     ensureRoomLink();
@@ -768,9 +755,9 @@ function attachScrollListener() {
   scroll.addEventListener('scroll', state.scrollHandler, { passive: true });
 }
 
-function createAvatar(user, tagged) {
+function createAvatar(user) {
   const avatar = document.createElement('div');
-  avatar.className = state.templates?.avatar || `chat2-group-avatar ${HASH.footer}`;
+  avatar.className = `chat2-group-avatar Av${Number(user?.id) || 0}s ${HASH.footer}`;
   avatar.setAttribute('role', 'button');
   avatar.tabIndex = 0;
   avatar.dataset.userId = String(user?.id || '');
@@ -784,11 +771,9 @@ function createAvatar(user, tagged) {
     if (img.src !== DEFAULT_AVATAR) img.src = DEFAULT_AVATAR;
   });
   avatar.appendChild(img);
-  if (tagged) {
-    const tag = document.createElement('div');
-    tag.className = state.templates?.tag || `chat2-tag ${HASH.footer}`;
-    avatar.appendChild(tag);
-  }
+  const tag = document.createElement('div');
+  tag.className = state.templates?.tag || `chat2-tag ${HASH.footer}`;
+  avatar.appendChild(tag);
   return avatar;
 }
 
@@ -804,7 +789,7 @@ function createGroup(messages, { dayLabel = null, tagged = false } = {}) {
   const group = document.createElement('div');
   group.className = state.templates?.group || `chat2-message-group ${HASH.footer}`;
   group.dataset.userId = String(first.user.id);
-  group.appendChild(createAvatar(first.user, tagged));
+  group.appendChild(createAvatar(first.user));
 
   const content = document.createElement('div');
   content.className = state.templates?.groupContent || `chat2-message-group-content ${HASH.footer}`;
@@ -1080,27 +1065,26 @@ function openMessageMenu(message, x, y) {
   if (!message) return;
 
   const menu = document.createElement('div');
-  menu.className = state.templates?.menu || `message-actions nr-menu ${HASH.menu}`;
+  menu.className = `message-actions ${HASH.menu}`;
+  menu.dataset.nrMenu = '1';
   menu.style.position = 'fixed';
-  menu.style.zIndex = '2147483000';
+  menu.style.zIndex = '10000';
   const list = document.createElement('ul');
-  list.className = state.templates?.menuList || `menu ${HASH.menu}`;
+  list.className = `menu ${HASH.menu}`;
   menu.appendChild(list);
 
   const add = (icon, label, handler, options = {}) => {
     const item = document.createElement('li');
-    item.className = state.templates?.menuAction || `action ${HASH.menu}`;
-    if (options.danger) item.classList.add('nr-danger');
+    item.className = `action ${HASH.menu}`;
     if (options.disabled) item.setAttribute('aria-disabled', 'true');
     const iconWrap = document.createElement('span');
-    iconWrap.className = state.templates?.menuIcon || `Svg-Icon ${HASH.menu}`;
-    iconWrap.innerHTML = NR_ICONS[icon] || NR_ICONS.copy;
-    const text = document.createElement('span');
-    text.className = 'nr-menu-label';
-    text.textContent = label;
+    iconWrap.className = `Svg-Icon ${HASH.menu}`;
+    iconWrap.innerHTML = icon;
+    iconWrap.querySelector('svg')?.classList.add(HASH.menu);
     item.appendChild(iconWrap);
-    item.appendChild(text);
+    item.appendChild(document.createTextNode(` ${label}`));
     if (!options.disabled) {
+      item.addEventListener('pointerdown', (event) => event.stopPropagation());
       item.addEventListener('click', (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -1113,32 +1097,31 @@ function openMessageMenu(message, x, y) {
 
   if (message.pending) {
     if (message.failed) {
-      add('retry', 'Повторить отправку', () => retryPending(message.clientId));
+      add(NR_ICONS.retry, 'Повторить отправку', () => retryPending(message.clientId));
     }
-    add('delete', 'Отменить сообщение', () => removePending(message.clientId), { danger: true });
-  } else if (message.deleted) {
-    add('copy', 'Сообщение удалено', () => {}, { disabled: true });
-  } else {
-    add('reply', 'Ответить', () => startReply(message));
-    add('mention', 'Упомянуть', () => mentionMessage(message));
-    add('copy', 'Скопировать текст', () => copyText(message.text || extractTextFromHtml(message.html)));
+    add(NR_ICONS.delete, 'Отменить сообщение', () => removePending(message.clientId));
+  } else if (!message.deleted) {
+    add(NR_ICONS.reply, 'Ответить', () => startReply(message));
+    add(NR_ICONS.mention, 'Упомянуть', () => mentionMessage(message));
+    add(NR_ICONS.copy, 'Скопировать текст', () =>
+      copyText(message.text || extractTextFromHtml(message.html)),
+    );
     if (message.user?.id === state.user?.id) {
-      add('edit', 'Редактировать', () => startEdit(message));
-      add('delete', 'Удалить', () => deleteMessage(message), { danger: true });
+      add(NR_ICONS.edit, 'Редактировать', () => startEdit(message));
+      add(NR_ICONS.delete, 'Удалить', () => deleteMessage(message));
     }
-    if (message.meta?.hasMedia) {
-      const media = firstMediaUrl(message.html);
-      if (media) {
-        add('external', 'Открыть медиа', () => window.open(media, '_blank', 'noopener'));
-        add('link', 'Скопировать ссылку', () => copyText(media));
-      }
+    const media = firstMediaUrl(message.html);
+    if (media) {
+      add(NR_ICONS.external, 'Открыть медиа', () => window.open(media, '_blank', 'noopener'));
+      add(NR_ICONS.link, 'Скопировать медиа', () => copyText(media));
     }
     if (IS_TOUCH) {
-      add('select', 'Выделить текст', () => selectMessageText(message));
+      add(NR_ICONS.select, 'Выделить текст', () => selectMessageText(message));
     }
   }
 
   if (!list.children.length) return;
+  menu.addEventListener('pointerdown', (event) => event.stopPropagation());
   document.body.appendChild(menu);
   positionMenu(menu, x, y);
   state.menuEl = menu;
@@ -1180,66 +1163,6 @@ function closeMenu() {
     state.menuEl.remove();
     state.menuEl = null;
   }
-}
-
-function confirmAction({ title, text, confirmLabel = 'Подтвердить', danger = false }) {
-  return new Promise((resolve) => {
-    const backdrop = document.createElement('div');
-    backdrop.className = 'nr-modal-backdrop';
-    const modal = document.createElement('div');
-    modal.className = 'nr-modal';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    const heading = document.createElement('div');
-    heading.className = 'nr-modal-title';
-    heading.textContent = title;
-    const content = document.createElement('div');
-    content.className = 'nr-modal-text';
-    content.textContent = text;
-    const actions = document.createElement('div');
-    actions.className = 'nr-modal-actions';
-    const cancel = document.createElement('button');
-    cancel.type = 'button';
-    cancel.className = 'button';
-    cancel.textContent = 'Отмена';
-    const confirm = document.createElement('button');
-    confirm.type = 'button';
-    confirm.className = 'button primary';
-    confirm.textContent = confirmLabel;
-    if (danger) {
-      confirm.style.background = '#a33a3f';
-      confirm.style.borderColor = '#a33a3f';
-    }
-    actions.appendChild(cancel);
-    actions.appendChild(confirm);
-    modal.appendChild(heading);
-    modal.appendChild(content);
-    modal.appendChild(actions);
-    backdrop.appendChild(modal);
-    document.body.appendChild(backdrop);
-
-    let done = false;
-    const finish = (value) => {
-      if (done) return;
-      done = true;
-      backdrop.remove();
-      document.removeEventListener('keydown', onKey, true);
-      resolve(value);
-    };
-    const onKey = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        finish(false);
-      }
-    };
-    cancel.addEventListener('click', () => finish(false));
-    confirm.addEventListener('click', () => finish(true));
-    backdrop.addEventListener('click', (event) => {
-      if (event.target === backdrop) finish(false);
-    });
-    document.addEventListener('keydown', onKey, true);
-    setTimeout(() => cancel.focus(), 0);
-  });
 }
 
 function showSystemMessage(text) {

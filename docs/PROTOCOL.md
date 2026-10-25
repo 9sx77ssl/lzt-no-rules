@@ -35,6 +35,7 @@
   "session": "<opaque session token>",
   "expiresAt": 1795538496011,
   "online": 1,
+  "users": [{"id":9252369,"username":"yolo","usernameHtml":"...","avatar":"...","color":"#949494","profileUrl":"..."}],
   "serverTime": 1792946496011
 }
 ```
@@ -143,7 +144,7 @@
 | Клиент | Сервер | Назначение |
 |---|---|---|
 | `{"type":"typing"}` | `{"type":"typing","user":{"id","username"}}` | индикатор набора |
-| `{"type":"presence"}` | `{"type":"presence","online":N}` | запрос/рассылка онлайна |
+| `{"type":"presence"}` | `{"type":"presence","online":N,"users":[...]}` | запрос/рассылка онлайна |
 | `{"type":"message.report","id":123,"reason":"..."}` | `{"type":"report.ok","id":123}` | жалоба |
 | `{"type":"ping","t":...}` | `{"type":"pong","t":...}` | heartbeat |
 | — | `{"type":"system","message":"..."}` | системное сообщение |
@@ -200,7 +201,16 @@
 - Если соединение пропало, `message.send` кладётся в outbox и отправляется
   после `auth.ok`; дедупликация по `clientId` защищает от повторов.
 
-## 8. Health/version
+## 8. Онлайн-модалка
+
+`presence` и `auth.ok` содержат `users` — уникальные авторизованные
+подключения (по `user.id`), а не количество сокетов. Клиент хранит этот
+список и по клику на «Онлайн: N» открывает нативную XenForo-модалку с
+участниками No Rules. Данные пользователя: `id`, `username`,
+`usernameHtml`, `avatar`, `color`, `profileUrl`. Токены и cookies в список
+не попадают.
+
+## 9. Health/version
 
 ```bash
 curl https://lztws.d9v.uk/health

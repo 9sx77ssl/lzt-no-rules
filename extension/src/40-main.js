@@ -1,7 +1,6 @@
-function isChatboxPage() {
-  return /^\/chatbox\/?$/.test(location.pathname);
-}
-
+/* Lifecycle and native integration: boot in the full Chatbox or floating
+ * widget, room activation, URL/hash persistence, global listeners and the
+ * debug API used by the Playwright suite. */
 function cancelNativeComposerUI() {
   const nativeReply = document.querySelector(
     '.chat2-footer .chat2-replying:not(#no-rules-reply) .chat2-cancel-reply',
@@ -22,13 +21,20 @@ function restoreNoRulesDraft() {
   }
 }
 
+function persistActiveUrl() {
+  if (!isFullChat()) return;
+  if (location.pathname !== '/chatbox/' && location.pathname !== '/chatbox') return;
+  if (location.hash !== '#no-rules') {
+    history.replaceState(null, '', '/chatbox/#no-rules');
+  }
+}
+
 function activateRoom({ fromNotification = false } = {}) {
   if (!state.initialized) return;
   if (state.active) {
     closeMenu();
-    if (location.hash !== '#no-rules') {
-      history.replaceState(null, '', '#no-rules');
-    }
+    persistActiveUrl();
+    setActivePreference(true);
     return;
   }
 
@@ -53,9 +59,8 @@ function activateRoom({ fromNotification = false } = {}) {
   updateUnreadBadge();
   updatePaused();
 
-  if (location.hash !== '#no-rules') {
-    history.replaceState(null, '', '#no-rules');
-  }
+  persistActiveUrl();
+  setActivePreference(true);
   closeSideMenu();
 
   if (state.wsAuthenticated) {
@@ -117,6 +122,7 @@ function deactivateRoom({ restoreHeader = true, nativeRoomClick = false } = {}) 
   updateUnreadBadge();
   updatePaused();
   closeMenu();
+  closeOnlineModal();
 
   if (state.nativeDraft) {
     setEditorHtml(state.nativeDraft);
@@ -124,8 +130,10 @@ function deactivateRoom({ restoreHeader = true, nativeRoomClick = false } = {}) 
   state.nativeDraft = '';
 
   if (restoreHeader) updateHeader();
+  setActivePreference(false);
   if (location.hash === '#no-rules') {
-    history.replaceState(null, '', location.pathname + location.search);
+    const path = isFullChat() ? '/chatbox/' : location.pathname + location.search;
+    history.replaceState(null, '', path);
   }
 
   if (!state.session) {
@@ -163,6 +171,14 @@ function mentionPopupIsOpen() {
 function onDocumentClickCapture(event) {
   const target = event.target instanceof Element ? event.target : null;
   if (!target) return;
+
+  if (state.active && target.closest('.roomTitleBlock > .roomOnline')) {
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    openOnlineModal();
+    return;
+  }
 
   const roomLink = target.closest('.goto-room');
   if (roomLink) {
@@ -366,6 +382,11 @@ function exposeDebugApi() {
     disconnect: () => disconnectNoRules(),
     requestHistory: () => requestInitialHistory(),
     requestOlder: () => requestOlderMessages(),
+    simulateTyping: (username = 'test') => {
+      if (!state.active) activateRoom();
+      markTyping({ id: 999999999, username: String(username || 'test').slice(0, 32) });
+      renderTypingOnly();
+    },
     send: (text, { html = false } = {}) => {
       if (!state.active) activateRoom();
       setEditorHtml(html ? String(text || '') : `<p>${escapeHtml(text)}</p>`);
@@ -395,44 +416,70 @@ function exposeDebugApi() {
   PAGE_WINDOW.__noRulesChat = api;
 }
 
-async function init() {
-  if (state.destroyed || state.initialized) return;
-  if (!isChatboxPage()) return;
-  if (document.body?.dataset.noRulesBoot === '1') return;
-  if (document.body) document.body.dataset.noRulesBoot = '1';
-  state.initStartedAt = now();
-
-  try {
-    await waitFor('.chat2-full-inner', 30_000);
-    await waitFor('.chat2-footer .tiptap', 30_000);
-  } catch {
-    return;
-  }
-
-  injectStyles();
-  captureTemplates();
-  state.nativeMessagesEl = document.querySelector(
-    '.chat2-full-inner .chat2-messages:not(#no-rules-messages)',
+function watchForChatRoot() {
+  if (state.rootObserver) return;
+  state.rootObserver = new MutationObserver(
+    debounce(() => {
+      if (getChatRoot() && !state.initialized) init();
+    }, 50),
   );
-  ensureRoomLink();
-  installGlobalListeners();
-  loadSession();
-  loadDraftStorage();
-  observeDom();
-  state.initialized = true;
-  exposeDebugApi();
+  state.rootObserver.observe(document.documentElement || document, {
+    childList: true,
+    subtree: true,
+  });
+}
 
-  if (location.hash === '#no-rules') {
-    setTimeout(() => activateRoom(), 250);
-  } else if (state.session) {
-    setTimeout(() => {
-      if (!state.active) connectNoRules({ userInitiated: false });
-    }, 1400);
+async function init() {
+  if (state.destroyed || state.initialized || state.initRunning) return;
+  state.initRunning = true;
+  try {
+    if (!document.body) {
+      document.addEventListener(
+        'DOMContentLoaded',
+        () => {
+          state.initRunning = false;
+          init();
+        },
+        { once: true },
+      );
+      return;
+    }
+    if (!getChatRoot()) {
+      watchForChatRoot();
+      return;
+    }
+    try {
+      await waitFor('.chat2[aria-label="chatbox"] .chat2-footer .tiptap', 30_000);
+    } catch {
+      watchForChatRoot();
+      return;
+    }
+    if (state.destroyed || state.initialized) return;
+    state.initStartedAt = now();
+    injectStyles();
+    captureTemplates();
+    state.nativeMessagesEl = getChatMessages();
+    ensureRoomLink();
+    installGlobalListeners();
+    loadSession();
+    loadDraftStorage();
+    observeDom();
+    state.initialized = true;
+    state.rootObserver?.disconnect();
+    state.rootObserver = null;
+    exposeDebugApi();
+
+    const wantActive = location.hash === '#no-rules' || hasActivePreference();
+    if (wantActive) {
+      setTimeout(() => activateRoom(), 250);
+    } else if (state.session) {
+      setTimeout(() => {
+        if (!state.active) connectNoRules({ userInitiated: false });
+      }, 1400);
+    }
+  } finally {
+    state.initRunning = false;
   }
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init, { once: true });
-} else {
-  init();
-}
+init();

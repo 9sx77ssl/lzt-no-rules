@@ -1,18 +1,18 @@
 // ==UserScript==
 // @name         Lolzteam Chatbox — No Rules
-// @namespace    https://lolz.team/no-rules
+// @namespace    https://lolz.team/gay1234
 // @version      __VERSION__
 // @description  Приватная комната No Rules внутри нативного Chatbox Lolzteam
-// @author       No Rules
+// @author       gay1234 (https://lolz.team/gay1234)
 // @match        https://lolz.team/*
 // @match        https://lolz.live/*
 // @match        https://lolz.guru/*
 // @match        https://zelenka.guru/*
-// @run-at       document-idle
+// @run-at       document-start
 // @grant        none
 // @noframes
-// @homepageURL  https://github.com/9sx77ssl/lzt-no-rules
-// @supportURL   https://github.com/9sx77ssl/lzt-no-rules/issues
+// @homepageURL  https://lolz.team/gay1234
+// @supportURL   https://lolz.team/gay1234
 // @updateURL    https://raw.githubusercontent.com/9sx77ssl/lzt-no-rules/main/extension/dist/no-rules.user.js
 // @downloadURL  https://raw.githubusercontent.com/9sx77ssl/lzt-no-rules/main/extension/dist/no-rules.user.js
 // ==/UserScript==

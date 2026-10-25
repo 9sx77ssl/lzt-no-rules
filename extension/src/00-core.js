@@ -1,3 +1,38 @@
+/**
+ * Shared state, storage helpers and DOM sanitizers for the No Rules room.
+ *
+ * The userscript is split into five plain-JS modules that the build step
+ * concatenates into one file. Keeping the state in a single typed object makes
+ * the WebSocket lifecycle, optimistic messages and native DOM bindings
+ * predictable; there are no third-party runtime dependencies.
+ *
+ * @typedef {Object} NrUser
+ * @property {number} id
+ * @property {string} username
+ * @property {string} [usernameHtml]
+ * @property {string|null} [avatar]
+ * @property {string|null} [color]
+ * @property {string} [profileUrl]
+ *
+ * @typedef {Object} NrReply
+ * @property {number} id
+ * @property {NrUser} user
+ * @property {string} text
+ * @property {boolean} [deleted]
+ *
+ * @typedef {Object} NrMessage
+ * @property {number|string} id
+ * @property {NrUser} user
+ * @property {string} html
+ * @property {string} text
+ * @property {number} createdAt
+ * @property {number|null} [editedAt]
+ * @property {boolean} [deleted]
+ * @property {boolean} [pending]
+ * @property {boolean} [failed]
+ * @property {string} [clientId]
+ * @property {NrReply|null} [reply]
+ */
 const BUILD = {
   wsUrl: '__WS_URL__',
   accessKey: '__ACCESS_KEY__',
@@ -8,6 +43,7 @@ const BUILD = {
 const STORAGE_KEYS = {
   session: 'lzt.no-rules.session.v1',
   draft: 'lzt.no-rules.draft.v1',
+  active: 'lzt.no-rules.active.v1',
 };
 
 const HASH = {
@@ -19,6 +55,8 @@ const HASH = {
   menu: 'lztng-36rp8q',
   paused: 'lztng-b261a2',
   typing: 'lztng-1pt7lw4',
+  spinner: 'lztng-1f69oee',
+  online: 'lztng-yzgsen',
 };
 
 const IS_TOUCH =
@@ -31,6 +69,8 @@ const state = {
   active: false,
   initialized: false,
   initStartedAt: 0,
+  initRunning: false,
+  rootObserver: null,
   user: null,
   session: null,
   sessionExpiresAt: 0,
@@ -47,9 +87,9 @@ const state = {
   heartbeatTimer: null,
   lastPongAt: 0,
   messages: new Map(),
+  deletedIds: new Set(),
   pending: new Map(),
   pendingEdits: new Map(),
-  pendingDeletes: new Map(),
   outbox: [],
   lastMessageId: 0,
   historyLoaded: false,
@@ -58,6 +98,7 @@ const state = {
   syncPages: 0,
   oldestId: null,
   online: 0,
+  onlineUsers: [],
   typing: new Map(),
   unread: 0,
   replyTo: null,
@@ -77,7 +118,6 @@ const state = {
   enforceTimer: null,
   renderTimer: null,
   menuEl: null,
-  confirmEl: null,
   toastEl: null,
   toastTimer: null,
   roomLink: null,
@@ -116,7 +156,7 @@ const FULL_DATE_FORMAT = new Intl.DateTimeFormat('ru-RU', {
 });
 const DAY_FORMAT = new Intl.DateTimeFormat('ru-RU', {
   day: 'numeric',
-  month: 'long',
+  month: 'short',
   year: 'numeric',
 });
 
@@ -167,6 +207,39 @@ function removeKey(key) {
     localStorage.removeItem(key);
   } catch {
     // ignore
+  }
+}
+
+function getChatRoot() {
+  return (
+    document.querySelector('.chat2[aria-label="chatbox"]') ||
+    document.querySelector('.chat2-full-inner, .chat2-widget-inner')
+  );
+}
+
+function getChatMessages() {
+  return getChatRoot()?.querySelector('.chat2-messages:not(#no-rules-messages)') || null;
+}
+
+function isFullChat() {
+  const root = getChatRoot();
+  return Boolean(root && !root.classList.contains('chat2-widget-inner'));
+}
+
+function setActivePreference(active) {
+  try {
+    if (active) localStorage.setItem(STORAGE_KEYS.active, '1');
+    else localStorage.removeItem(STORAGE_KEYS.active);
+  } catch {
+    // ignore
+  }
+}
+
+function hasActivePreference() {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.active) === '1';
+  } catch {
+    return false;
   }
 }
 
@@ -478,11 +551,10 @@ function insertEditorMention(user) {
 }
 
 function getScrollElement() {
-  const nativeMessages =
-    els.nativeMessagesEl || document.querySelector('.chat2-full-inner .chat2-messages');
+  const nativeMessages = getChatMessages() || els.nativeMessagesEl;
   const parent = nativeMessages?.parentElement;
   if (parent && parent.classList.contains('scrollable-content')) return parent;
-  return document.querySelector('.chat2-full-inner > .scrollable > .scrollable-content');
+  return getChatRoot()?.querySelector('.scrollable > .scrollable-content') || null;
 }
 
 function isNearBottom(threshold = 140) {
@@ -616,7 +688,7 @@ function sortedMessages() {
 }
 
 function allVisibleMessages() {
-  const messages = sortedMessages();
+  const messages = sortedMessages().filter((message) => !message.deleted);
   const pending = [...state.pending.values()].sort((a, b) => a.createdAt - b.createdAt);
   return messages.concat(pending);
 }
@@ -651,6 +723,12 @@ function debugState() {
     initialized: state.initialized,
     wsState: state.wsState,
     wsAuthenticated: state.wsAuthenticated,
+    socketOpen: state.ws?.readyState === 1,
+    chatRoot: getChatRoot()
+      ? getChatRoot().classList.contains('chat2-widget-inner')
+        ? 'widget'
+        : 'full'
+      : null,
     user: state.user
       ? {
           id: state.user.id,

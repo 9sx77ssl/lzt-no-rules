@@ -1,3 +1,5 @@
+/* Message rendering and message actions: grouping, optimistic sends,
+ * history paging, replies, edits, deletes and the native typing indicator. */
 function findMessage(id) {
   const numeric = Number(id);
   if (!Number.isFinite(numeric)) return null;
@@ -58,9 +60,7 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
   }
 
   const messages = allVisibleMessages();
-  if (!messages.length) {
-    container.appendChild(buildEmptyState());
-  } else {
+  if (messages.length) {
     const groups = [];
     let current = null;
     for (const message of messages) {
@@ -142,58 +142,39 @@ function buildConnectionBanner() {
   return banner;
 }
 
-function buildEmptyState() {
-  const empty = document.createElement('div');
-  empty.className = 'nr-empty';
-  const icon = document.createElement('i');
-  icon.className = state.wsState === 'connected' ? 'far fa-comments' : 'fas fa-spinner fa-spin';
-  const title = document.createElement('div');
-  title.className = 'nr-empty-title';
-  const subtitle = document.createElement('div');
-  subtitle.className = 'muted';
-  if (state.wsState === 'connected') {
-    title.textContent = 'Пока нет сообщений';
-    subtitle.textContent = 'Напишите первым';
-  } else if (state.connectionError) {
-    title.textContent = 'Нет соединения';
-    subtitle.textContent = 'Проверьте подключение и попробуйте снова';
-  } else {
-    title.textContent = 'Подключение к No Rules…';
-    subtitle.textContent = 'Это может занять пару секунд';
-  }
-  empty.appendChild(icon);
-  empty.appendChild(title);
-  empty.appendChild(subtitle);
-  return empty;
-}
-
 function renderTypingInto(container) {
-  const existing = container.querySelector('#no-rules-typing');
+  let typing = container.querySelector('#no-rules-typing');
+  if (!typing) {
+    typing = document.createElement('div');
+    typing.id = 'no-rules-typing';
+    typing.className = `chat2-typingDetails ${HASH.typing}`;
+    typing.innerHTML = `<div class="lztui-spinner-wrapper lztui-spinner-full ${HASH.spinner}"><div class="lztui-spinner lztui-spinner-small lztui-spinner-full ${HASH.spinner}"><div class="lztui-spinner-bounce lztui-spinner-bounce1 ${HASH.spinner}"></div><div class="lztui-spinner-bounce lztui-spinner-bounce2 ${HASH.spinner}"></div><div class="lztui-spinner-bounce lztui-spinner-bounce3 ${HASH.spinner}"></div></div></div><span class="chat2-typingUsers ${HASH.typing}"></span>`;
+    container.appendChild(typing);
+  }
   const users = [...state.typing.values()]
     .filter((entry) => entry && entry.user?.id !== state.user?.id && now() - entry.at < 5000)
-    .map((entry) => entry.user);
+    .map((entry) => entry.user)
+    .filter((user) => user?.username);
+  const spinner = typing.querySelector('.lztui-spinner-wrapper');
+  const text = typing.querySelector('.chat2-typingUsers');
+  if (!spinner || !text) return;
+
   if (!users.length) {
-    existing?.remove();
+    typing.classList.remove('visible');
+    spinner.style.display = 'none';
+    text.textContent = '';
     return;
   }
-  const typing = existing || document.createElement('div');
-  typing.id = 'no-rules-typing';
-  typing.className = state.templates?.typing || `chat2-typingDetails ${HASH.typing}`;
-  const text = document.createElement('span');
-  text.className = state.templates?.typingUsers || `chat2-typingUsers ${HASH.typing}`;
-  const names = users.map((user) => user.username).filter(Boolean);
-  if (!names.length) {
-    typing.remove();
-    return;
+
+  typing.classList.add('visible');
+  spinner.style.display = '';
+  if (users.length === 1) {
+    text.textContent = `${users[0].username} печатает`;
+  } else if (users.length === 2) {
+    text.textContent = `${users[0].username} и ${users[1].username} печатают`;
+  } else {
+    text.textContent = `${users[0].username} и еще ${users.length - 1} печатают`;
   }
-  text.textContent =
-    names.length === 1
-      ? `${names[0]} печатает…`
-      : names.length === 2
-        ? `${names[0]} и ${names[1]} печатают…`
-        : `${names[0]}, ${names[1]} и ещё ${names.length - 2} печатают…`;
-  typing.replaceChildren(text);
-  if (!existing) container.appendChild(typing);
 }
 
 function renderTypingOnly() {
@@ -236,6 +217,11 @@ function mergeHistoryMessages(messages, { mode = 'initial' } = {}) {
   for (const message of messages) {
     if (!message || !Number.isFinite(Number(message.id)) || !message.user?.id) continue;
     const id = Number(message.id);
+    if (message.deleted) {
+      state.deletedIds.add(id);
+      if (state.messages.delete(id)) changed = true;
+      continue;
+    }
     const existing = state.messages.get(id);
     if (!existing) {
       state.messages.set(id, message);
@@ -342,19 +328,11 @@ function handleIncomingEdit(payload) {
 function handleIncomingDelete(payload) {
   const id = Number(payload?.id ?? payload?.message?.id);
   if (!Number.isFinite(id)) return;
-  const existing = state.messages.get(id);
-  if (payload.message?.user?.id) {
-    state.messages.set(id, payload.message);
-  } else if (existing) {
-    existing.deleted = true;
-    existing.html = '';
-    existing.text = '';
-    existing.deleting = false;
-    existing.deletedAt = Date.now();
-    state.messages.set(id, existing);
-  }
+  state.deletedIds.add(id);
+  state.messages.delete(id);
   state.pendingEdits.delete(id);
-  state.pendingDeletes.delete(id);
+  if (state.replyTo?.id === id) cancelReply();
+  if (state.editing?.id === id) cancelEdit({ restore: true });
   if (state.active) {
     renderMessages({
       preserveScroll: true,
@@ -388,7 +366,7 @@ function cancelReply() {
 function renderReplyBar() {
   document.getElementById('no-rules-reply')?.remove();
   if (!state.replyTo) return;
-  const inputBox = document.querySelector('.chat2-footer .chat2-inputBox');
+  const inputBox = getChatRoot()?.querySelector('.chat2-footer .chat2-inputBox');
   if (!inputBox) return;
   const bar = document.createElement('div');
   bar.id = 'no-rules-reply';
@@ -396,7 +374,8 @@ function renderReplyBar() {
 
   const icon = document.createElement('div');
   icon.className = `svg-icon-reply ${HASH.footer}`;
-  icon.innerHTML = NR_ICONS.reply;
+  icon.innerHTML = NR_ICONS.replyBar;
+  icon.querySelector('svg')?.classList.add(HASH.footer);
   bar.appendChild(icon);
 
   const container = document.createElement('div');
@@ -406,20 +385,20 @@ function renderReplyBar() {
   let authorHtml = state.replyTo.user?.usernameHtml ||
     `<span class="styleUserNickname">${escapeHtml(state.replyTo.user?.username || 'unknown')}</span>`;
   authorHtml = sanitizeClientHtml(authorHtml);
-  author.innerHTML = authorHtml;
+  author.innerHTML = `Ответ ${authorHtml}`;
   const text = document.createElement('span');
   text.className = `chat2-replying-text ${HASH.footer}`;
-  text.textContent = state.replyTo.text || '[вложение]';
-  text.title = state.replyTo.text || '';
+  const paragraph = document.createElement('p');
+  paragraph.textContent = state.replyTo.text || '[вложение]';
+  text.appendChild(paragraph);
   container.appendChild(author);
   container.appendChild(text);
   bar.appendChild(container);
 
-  const cancel = document.createElement('div');
+  const cancel = document.createElement('span');
   cancel.className = `chat2-cancel-reply ${HASH.footer}`;
   cancel.setAttribute('role', 'button');
   cancel.tabIndex = 0;
-  cancel.title = 'Отменить ответ';
   cancel.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -456,18 +435,17 @@ function startEdit(message) {
 function renderEditBar() {
   document.getElementById('no-rules-editing')?.remove();
   if (!state.editing) return;
-  const footer = document.querySelector('.chat2-footer');
+  const footer = getChatRoot()?.querySelector('.chat2-footer');
   const inputBox = footer?.querySelector('.chat2-inputBox');
   if (!footer || !inputBox) return;
   const bar = document.createElement('div');
   bar.id = 'no-rules-editing';
   bar.className = `chat2-message-editing ${HASH.footer}`;
   bar.appendChild(document.createTextNode('Редактирование сообщения'));
-  const cancel = document.createElement('div');
+  const cancel = document.createElement('span');
   cancel.className = `chat2-cancel-editing ${HASH.footer}`;
   cancel.setAttribute('role', 'button');
   cancel.tabIndex = 0;
-  cancel.title = 'Отменить редактирование';
   cancel.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -547,31 +525,13 @@ function mentionMessage(message) {
   sendTyping();
 }
 
-async function deleteMessage(message) {
+function deleteMessage(message) {
   if (!state.active || !message || message.deleted || message.pending) return;
   if (message.user?.id !== state.user?.id) return;
-  const ok = await confirmAction({
-    title: 'Удалить сообщение?',
-    text: 'Сообщение будет удалено для всех участников комнаты.',
-    confirmLabel: 'Удалить',
-    danger: true,
-  });
-  if (!ok) return;
-  const existing = state.messages.get(message.id);
-  if (!existing) return;
-  const previous = { ...existing };
-  existing.deleting = true;
-  state.messages.set(existing.id, existing);
-  renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
-  const sent = sendWs({ type: 'message.delete', id: existing.id });
+  const sent = sendWs({ type: 'message.delete', id: message.id });
   if (!sent) {
-    existing.deleting = false;
-    state.messages.set(existing.id, existing);
     showToast('Нет соединения. Сообщение не удалено.', 'error');
-    renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
-    return;
   }
-  state.pendingDeletes.set(existing.id, previous);
 }
 
 function retryPending(clientId) {
@@ -691,11 +651,6 @@ function handleServerError(payload) {
     if (state.pendingEdits.has(messageId)) {
       const previous = state.pendingEdits.get(messageId);
       state.pendingEdits.delete(messageId);
-      state.messages.set(messageId, previous);
-    }
-    if (state.pendingDeletes.has(messageId)) {
-      const previous = state.pendingDeletes.get(messageId);
-      state.pendingDeletes.delete(messageId);
       state.messages.set(messageId, previous);
     }
     if (state.active) renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });

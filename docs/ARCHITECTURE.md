@@ -1,0 +1,115 @@
+# Архитектура расширения
+
+## 1. Модули
+
+Сборка `scripts/build-extension.mjs` просто склеивает файлы в один userscript,
+поэтому порядок модулей фиксирован:
+
+| Модуль | Ответственность |
+|---|---|
+| `00-core.js` | состояние, `localStorage`, санитайзер HTML, работа с корнем Chatbox, скролл, форматирование дат |
+| `10-ui.js` | нативные классы/шаблоны, CSS, боковое меню, socket-индикатор, контекстное меню, online-модалка, жесты |
+| `20-messages.js` | группировка сообщений, история, optimistic send, reply/edit/delete, typing |
+| `30-ws.js` | auth/resume, WebSocket, heartbeat, reconnect, outbox, presence |
+| `40-main.js` | boot, активация комнаты, hash/URL, глобальные слушатели, debug API |
+
+Все модули работают в одном page-context. `@grant none` + `@run-at
+document-start`; в Firefox используется `unsafeWindow` fallback.
+
+## 2. Корень Chatbox
+
+Один и тот же Svelte-компонент используется в двух местах:
+
+- `/chatbox/` → `.chat2.chat2-full-inner`;
+- плавающее окно на любой странице → `.chat2.chat2-widget-inner` внутри
+  `.chat2-floating`.
+
+`getChatRoot()` возвращает `.chat2[aria-label="chatbox"]`, поэтому все
+селекторы, скролл, composer, reply/edit-бары и online-модалка работают
+одинаково в full chat и widget.
+
+`init()` не привязан к `/chatbox/`. Он ждёт появления корня через
+`MutationObserver`, поэтому script подхватывает и кнопку чата справа снизу.
+
+## 3. Активация комнаты
+
+1. `ensureRoomLink()` клонирует нативную ссылку комнаты и добавляет
+   `data-no-rules`.
+2. `activateRoom()`:
+   - сохраняет нативный черновик;
+   - создаёт `#no-rules-messages` с нативным классом `chat2-messages`;
+   - скрывает нативный `.chat2-messages`;
+   - поднимает WebSocket/историю;
+   - на full chat ставит URL `/chatbox/#no-rules`;
+   - пишет `lzt.no-rules.active.v1=1`.
+3. `deactivateRoom()` удаляет свой контейнер из DOM, возвращает нативный,
+   снимает hash и флаг активной комнаты.
+
+Поэтому F5 на `/chatbox/#no-rules` остаётся в комнате, а плавающее окно не
+меняет URL страницы.
+
+## 4. Нативное состояние и сообщения
+
+`state.templates` собирается из живого нативного DOM: группы, аватары,
+заголовки, `chat2-message-block`, `chat2-message-text`, reply-разметка,
+socket-индикатор. При рендере используются **те же классы**, поэтому CSS
+Svelte применяется без копирования стилей.
+
+Исключения — ленивые Svelte-чанки, которые не загружаются, пока нативный
+компонент не открыт:
+
+- `message-actions` (контекстное меню);
+- `lztui-spinner` (три точки typing);
+- `top-users` (online-модалка).
+
+Их CSS скопирован в `NR_CSS` с теми же хешами (`lztng-36rp8q`,
+`lztng-1f69oee`, `lztng-yzgsen`). Поэтому вид одинаков и в full chat, и в
+widget, где соответствующий чанк ещё не загружен.
+
+## 5. Меню, reply, edit
+
+- Меню: `div.message-actions > ul.menu > li.action > span.Svg-Icon + текст`,
+  ширина 230 px, нативные иконки, hover/active из Svelte CSS.
+- Reply-бар: `div.chat2-replying`, `svg-icon-reply`, author «Ответ <ник>»,
+  текст в `<p>`, нативный `chat2-cancel-reply`.
+- Edit-бар: `div.chat2-message-editing` + `chat2-cancel-editing`, вставляется
+  перед `.chat2-inputBox`.
+- Удаление: без подтверждения и без tombstone; сообщение удаляется из Map и
+  DOM. В истории серверные `deleted` отбрасываются, а reply на удалённое
+  показывает «Сообщение удалено», как нативный чат.
+
+## 6. Typing
+
+В конце `#no-rules-messages` всегда живёт `chat2-typingDetails` высотой
+23 px + `margin-top: 8px`. Это резервирует те же 31 px, что и нативный чат,
+поэтому сообщения не прилипают к полю ввода. Внутри — точная разметка
+`lztui-spinner` с тремя `lztui-spinner-bounce` и текст:
+
+- `user печатает`;
+- `user1 и user2 печатают`;
+- `user1 и еще N печатают`.
+
+## 7. Online-модалка
+
+Сервер в `presence`/`auth.ok` отдаёт `users` (id, username, usernameHtml,
+avatar, color, profileUrl). Клиент хранит `state.onlineUsers` и по клику на
+`.roomOnline` открывает XenForo-подобный `modal > xenOverlay` с нативными
+классами `top-users-container`, `top-user-item lztng-yzgsen`,
+`user-abour-container`, `user-stats-block`. Показываются только участники
+No Rules; нативная комната не затрагивается.
+
+## 8. WebSocket
+
+- `auth` — временный токен форума + `ACCESS_KEY`;
+- `resume` — opaque session token (на сервере только SHA-256);
+- heartbeat 25 с, reconnect с exponential backoff;
+- outbox для `message.send` при обрыве;
+- `clientId` дедуплицирует повторные отправки;
+- история грузится по 60/50, позиция скролла сохраняется.
+
+## 9. Тесты
+
+Playwright-сценарии лежат вне репозитория и запускаются против production
+WSS. Проверяются full chat, widget, mobile, Firefox, hash/reload,
+offline outbox, история > 60, меню, reply/edit/delete и online-модалка.
+Подробности — [TESTING.md](TESTING.md).
