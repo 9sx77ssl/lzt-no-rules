@@ -40,7 +40,15 @@ WebSocket-бэкенд к ней. Комната выглядит и ведёт 
   31 px снизу, что и оригинальный Chatbox, поэтому сообщения не прилипают к
   полю ввода.
 - Клик по «Онлайн: N» показывает участников именно No Rules в нативной
-  XenForo-модалке (`top-users-container`, `top-user-item`).
+  XenForo-модалке (`top-users-container`, `top-user-item`) с нативными
+  счётчиками: симпатии, симпатии 2, сообщения, трофеи, конкурсы.
+- Нативные карточки Tiptap для Telegram/Steam/Market, SoundCloud, YouTube,
+  TikTok и разделов форума (`.unfurlContainer`, `.unfurl-renderer`,
+  `.embed-link`, `internalNodeLink`).
+- Копирование в BBCode-совместимом виде: `[unfurl="..."]`,
+  `[MEDIA=soundcloud]`, `[URL=...]`, `[IMG]...[/IMG]`, smilies `:name:`.
+- **Без собственных тостов.** В нативном Chatbox их нет; диагностика идёт
+  только в `console.debug`.
 - Индикатор соединения, состояния `connecting/connected/disconnected`,
   ошибки и повторное подключение.
 - Очередь исходящих сообщений: если связь пропала, сообщение отправится

@@ -78,6 +78,18 @@ widget, где соответствующий чанк ещё не загруж�
   DOM. В истории серверные `deleted` отбрасываются, а reply на удалённое
   показывает «Сообщение удалено», как нативный чат.
 
+## 5.1. Embeds и копирование
+
+Tiptap при вставке ссылки создаёт нативные Svelte-ноды `.unfurl-renderer`
+(Telegram/Steam/Market, форум) или `.embed-link` (SoundCloud/YouTube/TikTok).
+Серверный и клиентский санитайзеры сохраняют их классы и `data-*`; CSS форума
+рисует карточки 1:1. Для обычного текста с URL клиент делает linkify, чтобы
+ссылка была кликабельной даже в старых сообщениях.
+
+`htmlToBbcode()` повторяет `messageRaw`: `[unfurl="..."]`, `[UNFURL="..."]`,
+`[MEDIA=soundcloud|youtube|tiktok]`, `[URL=...]`, `[IMG]...[/IMG]`, smilies
+`:name:`. Никаких тостов после копирования нет — только `console.debug`.
+
 ## 6. Typing
 
 В конце `#no-rules-messages` всегда живёт `chat2-typingDetails` высотой

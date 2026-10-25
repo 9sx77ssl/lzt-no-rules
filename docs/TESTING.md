@@ -120,6 +120,19 @@ Escape.
 Высота блока 23 px + `margin-top: 8px`; сообщения не должны прилипать к
 полю ввода.
 
+## 6.4. Embeds, links, copy и никаких тостов
+
+- Вставить в нативный Tiptap ссылку и отправить:
+  `https://lzt.market/telegram/`, `https://soundcloud.com/...`,
+  `https://youtube.com/watch?v=...`, `https://lolz.team/forums/contests/`.
+  Должны появиться нативные карточки (`unfurl-renderer`, `embed-link`,
+  `forum-wrapper`) с иконкой/заголовком.
+- ПКМ → «Скопировать текст»: в буфере `[unfurl="..."]`, `[MEDIA=soundcloud]`,
+  `[MEDIA=youtube]`, `[MEDIA=tiktok]`, `[UNFURL="..."]` — как `messageRaw`.
+- ПКМ по обычному тексту не должен показывать «Открыть медиа» /
+  «Скопировать медиа»; они появляются только при клике по `img`/`video`.
+- После copy/ошибок не должно появляться `.nr-toast`; только `console.debug`.
+
 ## 7. Lifecycle: hash, refresh, reconnect, offline
 
 1. Открыть `https://lolz.team/chatbox/#no-rules` с чистым контекстом.

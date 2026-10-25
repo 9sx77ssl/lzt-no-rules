@@ -207,7 +207,8 @@
 подключения (по `user.id`), а не количество сокетов. Клиент хранит этот
 список и по клику на «Онлайн: N» открывает нативную XenForo-модалку с
 участниками No Rules. Данные пользователя: `id`, `username`,
-`usernameHtml`, `avatar`, `color`, `profileUrl`. Токены и cookies в список
+`usernameHtml`, `avatar`, `color`, `profileUrl`, `stats` (`likes`,
+`likes2`, `messages`, `trophies`, `contests`). Токены и cookies в список
 не попадают.
 
 ## 9. Health/version
