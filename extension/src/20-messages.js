@@ -48,10 +48,6 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
 
   container.replaceChildren();
 
-  if (state.connectionError) {
-    container.appendChild(buildConnectionBanner());
-  }
-
   if (state.historyLoading && state.historyHasMore) {
     const loading = document.createElement('div');
     loading.className = 'nr-loading-top';
@@ -118,28 +114,7 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
 
   updatePaused();
   updateUnreadBadge();
-}
-
-function buildConnectionBanner() {
-  const banner = document.createElement('div');
-  banner.className = 'nr-connection-banner';
-  const text = document.createElement('div');
-  text.className = 'nr-connection-text';
-  text.textContent = state.connectionError;
-  banner.appendChild(text);
-  const retry = document.createElement('button');
-  retry.type = 'button';
-  retry.className = 'button nr-connection-retry';
-  retry.textContent = 'Повторить';
-  retry.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    state.authFailedPermanently = false;
-    state.connectionError = '';
-    connectNoRules({ forceToken: true, userInitiated: true });
-  });
-  banner.appendChild(retry);
-  return banner;
+  updateConnectionError();
 }
 
 function renderTypingInto(container) {

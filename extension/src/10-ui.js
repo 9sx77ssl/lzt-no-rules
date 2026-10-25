@@ -35,21 +35,6 @@ const NR_ONLINE_ICONS = [
 
 const NR_CSS = `
 #no-rules-messages.nr-hidden { display: none !important; }
-#no-rules-messages .nr-connection-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 0 0 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 106, 112, .55);
-  background: rgba(255, 106, 112, .09);
-  color: #ffb3b6;
-  font-size: 13px;
-  line-height: 1.4;
-}
-#no-rules-messages .nr-connection-banner .nr-connection-text { flex: 1; min-width: 0; }
-#no-rules-messages .nr-connection-banner .button { flex-shrink: 0; padding: 4px 10px; font-size: 12px; }
 #no-rules-messages .nr-loading-top {
   display: flex;
   align-items: center;
@@ -711,6 +696,37 @@ function updatePaused() {
   if (paused.hidden !== !shouldShow) paused.hidden = !shouldShow;
 }
 
+function updateConnectionError() {
+  const existing = document.getElementById('no-rules-error');
+  if (!state.active || !state.connectionError) {
+    existing?.remove();
+    return;
+  }
+  const inputBox = getChatRoot()?.querySelector('.chat2-footer .chat2-inputBox');
+  if (!inputBox) {
+    existing?.remove();
+    return;
+  }
+  let error = existing;
+  if (!error) {
+    error = document.createElement('div');
+    error.id = 'no-rules-error';
+    error.className = `chat2-error ${HASH.footer}`;
+    error.setAttribute('role', 'alert');
+    error.title = 'Нажмите, чтобы повторить подключение';
+    error.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      state.authFailedPermanently = false;
+      state.connectionError = '';
+      updateConnectionError();
+      connectNoRules({ forceToken: true, userInitiated: true });
+    });
+    inputBox.appendChild(error);
+  }
+  if (error.textContent !== state.connectionError) error.textContent = state.connectionError;
+}
+
 function enforceActiveUI() {
   if (!state.initialized) return;
   const nativeMessages = getChatMessages();
@@ -731,6 +747,7 @@ function enforceActiveUI() {
     updateRoomLinkActive();
     updateUnreadBadge();
     updatePaused();
+    updateConnectionError();
   } else {
     // While No Rules is inactive the native Svelte app owns this subtree and
     // re-renders it on every room switch. Keep our node out of its way instead
@@ -743,6 +760,7 @@ function enforceActiveUI() {
     updateHeader();
     updateRoomLinkActive();
     updatePaused();
+    updateConnectionError();
   }
 }
 
