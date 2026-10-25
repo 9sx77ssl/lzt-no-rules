@@ -62,7 +62,8 @@ fancybox и XenForo video player.
   mentions.
 - Plain `@ник` резолвится через `POST /members/find` в нативный mention с
   аватаркой и SVG-иконкой; свой ник получает `highlight`.
-- Optimistic send, outbox при обрыве, повторная отправка, `clientId`.
+- Optimistic send, outbox при обрыве (переживает F5), повторная отправка,
+  `clientId` без дублей и автоматический retry после `rate_limited`.
 - **Одинаковые сообщения разрешены**: два одинаковых текста подряд дают два
   сообщения; дедупликация только по `clientId`.
 
@@ -164,7 +165,7 @@ fancybox и XenForo video player.
 │   └── build-extension.mjs    сборка одного файла
 ├── server/
 │   ├── src/                   backend
-│   ├── tests/                 20 unit tests
+│   ├── tests/                 21 unit tests
 │   ├── package.json
 │   └── bun.lock
 └── deploy/
@@ -198,7 +199,7 @@ antibot-файлы не коммитятся: в них могут быть то
 - Если raw ещё кешируется, обновите страницу/подождите несколько минут;
   `@updateURL`/`@downloadURL` указывают на `main`.
 - Firefox content-script WebSocket может отправлять `Origin: null`; сервер
-  1.1.19+ принимает его как missing origin, но всё равно требует read-JWT.
+  Сервер 1.1.19+ (сейчас 1.1.20) принимает его как missing origin, но всё равно требует read-JWT.
 - Userscript использует абсолютные URL и строковый `fetch`: форумный
   `window.fetch` в Firefox не принимает `URL`-объекты.
 
@@ -236,7 +237,7 @@ NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
 
 node --check extension/dist/no-rules.user.js
-cd server && bun test
+cd server && npm test
 ```
 
 Публикация:
@@ -339,8 +340,7 @@ node --check extension/dist/no-rules.user.js
 
 # backend
 cd server
-bun test        # 20 tests
-npm test        # Node fallback
+npm test        # 21 tests
 
 # production health
 curl -fsS https://lztws.d9v.uk/health
@@ -373,19 +373,19 @@ Playwright-сценарии (полный список — [docs/TESTING.md](doc
 ### «Нет связи с форумом»
 
 - Проверьте `/health` и вход на форум.
-- В Firefox обновите userscript до 1.1.16+ (абсолютные fetch URL).
+- В Firefox обновите userscript до 1.1.20 (абсолютные fetch URL).
 - Нажмите на нативный `.chat2-error` — он повторяет auth.
 
 ### Видео показывает только первый кадр
 
-- Обновите до 1.1.16: плеер монтируется через `XenForo.activate`.
+- Обновите до 1.1.20: плеер монтируется через `XenForo.activate`.
 - Не должно быть двух копий userscript.
 - Откройте консоль: `XenForo` должен быть объектом, `.video` — внутри
   `#no-rules-messages`.
 
 ### Фото не открывается
 
-- Обновите до 1.1.16: bare `<img>` оборачивается в `LbTrigger`.
+- Обновите до 1.1.20: bare `<img>` оборачивается в `LbTrigger`.
 - Проверьте, что fancybox не блокируется другим расширением.
 
 ### Смайл не увеличивается

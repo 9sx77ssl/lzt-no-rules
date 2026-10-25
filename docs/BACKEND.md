@@ -36,7 +36,7 @@ GET /health
 {
   "ok": true,
   "name": "no-rules-chat",
-  "version": "1.1.16",
+  "version": "1.1.20",
   "protocol": 1,
   "uptime": 123,
   "online": 2,
@@ -47,7 +47,7 @@ GET /health
 GET /version
 {
   "name": "no-rules-chat",
-  "version": "1.1.16",
+  "version": "1.1.20",
   "protocol": 1,
   "publicUrl": "wss://lztws.d9v.uk/ws"
 }
@@ -266,8 +266,7 @@ restart no-rules`, polling `/health`, rollback на предыдущий commit 
 
 ```bash
 cd server
-bun test        # 20 unit tests
-npm test        # Node fallback
+npm test        # 21 unit tests
 ```
 
 Тесты: `auth`, `antibot`, `db`, `ratelimit`, `sanitize`. Playwright-тесты

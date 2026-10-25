@@ -6,10 +6,10 @@
 cd /home/rsz/Desktop/lztext/no-rules
 node --check extension/dist/no-rules.user.js
 cd server
-bun test
+npm test
 ```
 
-`bun test` запускает 21 unit-тест: auth, antibot, db, rate limit,
+`npm test` запускает 21 unit-тест: auth, antibot, db, rate limit,
 sanitize. Playwright-сценарии лежат вне репозитория из-за storageState.
 
 ## 2. Сборка
@@ -199,7 +199,7 @@ DELETE FROM messages WHERE client_id LIKE 'seed-history-%';
 
 ## 9. Чек-лист перед релизом
 
-- [ ] `bun test` — 20/20.
+- [ ] `npm test` — 21/21.
 - [ ] `node --check extension/dist/no-rules.user.js`.
 - [ ] Desktop Chromium: все пункты раздела 4.
 - [ ] Mobile: нет горизонтального скролла, меню работает.

@@ -18,6 +18,12 @@
 - `broadcast` больше не отправляет сообщения неавторизованным сокетам.
 - Сервер и extension: `1.1.20`.
 
+## 1.1.19
+
+- Firefox/Tampermonkey: `fetch`/WebSocket через page-context, абсолютные URL.
+- `ALLOW_MISSING_ORIGIN`: `Origin: null` от content-script принимается как
+  missing origin, auth по-прежнему требует read-JWT и `ACCESS_KEY`.
+
 ## 1.1.17
 
 - Backend auth принимает только read/chatbox JWT и отклоняет scope `post`;
