@@ -1,0 +1,30 @@
+[Unit]
+Description=No Rules Chatbox WebSocket server
+Documentation=https://lztws.d9v.uk/health
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=no-rules
+Group=no-rules
+WorkingDirectory=/opt/no-rules/server
+EnvironmentFile=/opt/no-rules/.env
+ExecStart=/usr/local/bin/bun src/index.js
+Restart=always
+RestartSec=2
+TimeoutStopSec=15
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/no-rules/data
+LimitNOFILE=65535
+UMask=0027
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=no-rules
+
+[Install]
+WantedBy=multi-user.target

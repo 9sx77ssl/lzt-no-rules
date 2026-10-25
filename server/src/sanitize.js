@@ -1,0 +1,359 @@
+import sanitizeHtml from 'sanitize-html';
+import * as cheerio from 'cheerio';
+
+export class MessageError extends Error {
+  constructor(code, message, details = undefined) {
+    super(message);
+    this.name = 'MessageError';
+    this.code = code;
+    this.details = details;
+  }
+}
+
+const FORUM_HOSTS = [
+  'lolz.team',
+  'lolz.live',
+  'lolz.guru',
+  'zelenka.guru',
+  'api.lolz.team',
+  'api.lolz.live',
+  'api.lolz.guru',
+];
+
+const MEDIA_HOSTS = ['nztcdn.com', ...FORUM_HOSTS];
+
+const COLOR_RE = /^(#[0-9a-f]{3,8}|rgba?\([^)]{1,80}\)|hsla?\([^)]{1,80}\)|[a-z]{3,20})$/i;
+
+const USERNAME_STYLE_PROPS = new Map([
+  ['color', COLOR_RE],
+  ['-webkit-text-fill-color', COLOR_RE],
+  [
+    'background',
+    /^(#[0-9a-f]{3,8}|rgba?\([^)]{1,80}\)|hsla?\([^)]{1,80}\)|(linear|radial)-gradient\([^<>{};]{1,300}\))$/i,
+  ],
+  ['background-image', /^((linear|radial)-gradient\([^<>{};]{1,300}\)|none)$/i],
+  ['background-clip', /^(text|border-box|padding-box|content-box)$/i],
+  ['-webkit-background-clip', /^(text|border-box|padding-box|content-box)$/i],
+  ['text-shadow', /^[0-9a-z#.,%()\s-]{1,200}$/i],
+  ['font-weight', /^(normal|bold|bolder|lighter|[1-9]00)$/i],
+]);
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function hostAllowed(hostname, allowlist) {
+  const host = hostname.toLowerCase().replace(/\.$/, '');
+  return allowlist.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+}
+
+export function isAllowedMediaUrl(value, { allowExternalImages = false } = {}) {
+  if (typeof value !== 'string' || value.length > 4096) return false;
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:') return false;
+  if (allowExternalImages) return true;
+  return hostAllowed(url.hostname, MEDIA_HOSTS);
+}
+
+export function extractText(html) {
+  const $ = cheerio.load(String(html ?? ''), null, false);
+  $('img').each((_, element) => {
+    const alt = $(element).attr('alt') || $(element).attr('title') || '';
+    $(element).replaceWith(alt ? alt : '[изображение]');
+  });
+  $('video').each((_, element) => {
+    $(element).replaceWith('[видео]');
+  });
+  $('br').replaceWith('\n');
+  $('p, div, li, blockquote, pre').each((_, element) => {
+    $(element).append('\n');
+  });
+  return $.root()
+    .text()
+    .replaceAll('\u00a0', ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+export function normalizeColor(value) {
+  if (typeof value !== 'string') return null;
+  const color = value.trim();
+  if (!COLOR_RE.test(color)) return null;
+  if (/url\s*\(|expression\s*\(|javascript:/i.test(color)) return null;
+  return color;
+}
+
+export function sanitizeUsernameStyle(value) {
+  const declarations = [];
+  for (const part of String(value || '').split(';')) {
+    const declaration = part.trim();
+    if (!declaration) continue;
+    const separator = declaration.indexOf(':');
+    if (separator <= 0) continue;
+    const property = declaration.slice(0, separator).trim().toLowerCase();
+    const rawValue = declaration.slice(separator + 1).trim();
+    const pattern = USERNAME_STYLE_PROPS.get(property);
+    if (!pattern || !pattern.test(rawValue)) continue;
+    if (/url\s*\(|expression\s*\(|javascript:|@import|[<>{}]/i.test(rawValue)) continue;
+    declarations.push(`${property}:${rawValue}`);
+  }
+  return declarations.join(';');
+}
+
+function colorFromStyle(style) {
+  const match = String(style || '').match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+  return match ? normalizeColor(match[1]) : null;
+}
+
+/**
+ * Extract a safe, minimal username representation from the forum API's
+ * username_html. We intentionally do not keep user-provided SVG icons here:
+ * the colour is the important identity hint, and dropping inline SVG removes a
+ * whole class of markup injection risks.
+ */
+export function extractUsernameMeta(usernameHtml, fallbackUsername = '') {
+  const raw = typeof usernameHtml === 'string' ? usernameHtml : '';
+  let username = String(fallbackUsername || '').trim();
+  let style = '';
+
+  if (raw) {
+    const $ = cheerio.load(raw, null, false);
+    const nick = $('.styleUserNickname').first();
+    if (nick.length) {
+      const text = nick.text().trim();
+      if (text) username = text;
+      style = sanitizeUsernameStyle(nick.attr('style') || '');
+    } else {
+      const text = $.root().text().trim();
+      if (text) username = text;
+    }
+  }
+
+  if (!username) username = 'unknown';
+  username = username.slice(0, 64);
+  const color = colorFromStyle(style);
+  return {
+    username,
+    color,
+    usernameStyle: style,
+    usernameHtml: style
+      ? `<span class="styleUserNickname" style="${escapeHtml(style)}">${escapeHtml(username)}</span>`
+      : `<span class="styleUserNickname">${escapeHtml(username)}</span>`,
+  };
+}
+
+export function createSanitizer(options = {}) {
+  const allowExternalImages = options.allowExternalImages === true;
+  const maxHtml = options.maxMessageHtml ?? 12_000;
+  const maxText = options.maxMessageText ?? 2_000;
+  const maxImages = options.maxImagesPerMessage ?? 4;
+  const maxLinks = options.maxLinksPerMessage ?? 5;
+  const maxMentions = options.maxMentionsPerMessage ?? 8;
+  const maxNewlines = options.maxNewlinesPerMessage ?? 30;
+
+  const allowedTags = [
+    'p',
+    'br',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'u',
+    's',
+    'del',
+    'code',
+    'pre',
+    'blockquote',
+    'ul',
+    'ol',
+    'li',
+    'hr',
+    'sub',
+    'sup',
+    'a',
+    'img',
+    'span',
+    'div',
+    'abbr',
+    'video',
+    'source',
+  ];
+
+  const allowedAttributes = {
+    a: ['href', 'class', 'title', 'target', 'rel', 'style', 'data-user', 'contenteditable', 'translate'],
+    img: [
+      'src',
+      'alt',
+      'title',
+      'class',
+      'loading',
+      'width',
+      'height',
+      'data-url',
+      'data-fallback-src',
+    ],
+    abbr: ['title', 'class', 'data-tippy-content'],
+    span: ['class', 'style', 'data-user'],
+    p: ['class'],
+    div: ['class'],
+    video: ['src', 'poster', 'controls', 'preload', 'class', 'width', 'height', 'muted', 'loop', 'playsinline'],
+    source: ['src', 'type'],
+  };
+
+  const allowedClasses = {
+    a: ['notranslate', 'username', 'mention', 'internalLink', 'externalLink', 'LbTrigger', 'Tooltip'],
+    img: ['mceSmilie', 'mceSmilieLarge', 'big', 'bbCodeImage', 'LbImage', 'avatar'],
+    span: ['styleUserNickname', 'username', 'mention'],
+    abbr: ['Tooltip'],
+    div: ['bbCodeSpoiler', 'spoiler', 'unfurlContainer', 'videoContainer'],
+    video: ['videoContainer', 'videoWrapper'],
+  };
+
+  const allowedStyles = {
+    span: {
+      color: [/^#[0-9a-f]{3,8}$/i, /^rgba?\([^)]{1,80}\)$/i, /^hsla?\([^)]{1,80}\)$/i, /^[a-z]{3,20}$/i],
+      '-webkit-text-fill-color': [
+        /^#[0-9a-f]{3,8}$/i,
+        /^rgba?\([^)]{1,80}\)$/i,
+        /^hsla?\([^)]{1,80}\)$/i,
+        /^[a-z]{3,20}$/i,
+      ],
+      background: [
+        /^#[0-9a-f]{3,8}$/i,
+        /^rgba?\([^)]{1,80}\)$/i,
+        /^hsla?\([^)]{1,80}\)$/i,
+        /^(linear|radial)-gradient\([^<>{};]{1,300}\)$/i,
+      ],
+      'background-image': [/^(linear|radial)-gradient\([^<>{};]{1,300}\)$/i, /^none$/i],
+      'background-clip': [/^(text|border-box|padding-box|content-box)$/i],
+      '-webkit-background-clip': [/^(text|border-box|padding-box|content-box)$/i],
+      'text-shadow': [/^[0-9a-z#.,%()\s-]{1,200}$/i],
+      'font-weight': [/^(normal|bold|bolder|lighter|[1-9]00)$/i],
+    },
+  };
+  allowedStyles.a = allowedStyles.span;
+
+  function sanitizeMessage(rawHtml, { clientId = null } = {}) {
+    if (typeof rawHtml !== 'string') {
+      throw new MessageError('invalid', 'Сообщение имеет неверный формат');
+    }
+    if (rawHtml.length > maxHtml * 2) {
+      throw new MessageError('too_long', 'Сообщение слишком длинное');
+    }
+
+    const sanitized = sanitizeHtml(rawHtml, {
+      allowedTags,
+      allowedAttributes,
+      allowedClasses,
+      allowedStyles,
+      allowedSchemes: ['http', 'https', 'mailto'],
+      allowedSchemesByTag: {
+        img: ['https'],
+        video: ['https'],
+        source: ['https'],
+      },
+      allowProtocolRelative: false,
+      disallowedTagsMode: 'discard',
+      transformTags: {
+        a: (tagName, attribs) => {
+          const out = { ...attribs };
+          const href = String(out.href || '');
+          const classes = String(out.class || '');
+          const isLightbox = /(^|\s)LbTrigger(\s|$)/.test(classes);
+          if (/^https?:/i.test(href) && !isLightbox) {
+            out.target = '_blank';
+            out.rel = 'noopener noreferrer nofollow';
+          } else {
+            delete out.target;
+            delete out.rel;
+          }
+          return { tagName, attribs: out };
+        },
+        img: (tagName, attribs) => ({
+          tagName,
+          attribs: {
+            ...attribs,
+            loading: attribs.loading || 'lazy',
+          },
+        }),
+      },
+      exclusiveFilter: (frame) => {
+        if (frame.tag === 'img' || frame.tag === 'video' || frame.tag === 'source') {
+          return !isAllowedMediaUrl(frame.attribs.src, { allowExternalImages });
+        }
+        if (frame.tag === 'a') {
+          const href = frame.attribs.href;
+          if (!href) {
+            const text = frame.text?.trim();
+            return !text;
+          }
+        }
+        return false;
+      },
+    });
+
+    if (sanitized.length > maxHtml) {
+      throw new MessageError('too_long', 'Сообщение слишком длинное');
+    }
+
+    const $ = cheerio.load(sanitized, null, false);
+    const imageCount = $('img').not('.mceSmilie, .mceSmilieLarge').length;
+    const linkCount = $('a[href]').not('.mention').length;
+    const mentionCount = $('a.mention, span.mention, a.username.mention').length;
+    const text = extractText(sanitized);
+
+    if (text.length > maxText) {
+      throw new MessageError('too_long', 'Сообщение слишком длинное');
+    }
+    if (imageCount > maxImages) {
+      throw new MessageError('too_many_images', `Не более ${maxImages} изображений в сообщении`);
+    }
+    if (linkCount > maxLinks) {
+      throw new MessageError('too_many_links', `Не более ${maxLinks} ссылок в сообщении`);
+    }
+    if (mentionCount > maxMentions) {
+      throw new MessageError('too_many_mentions', `Не более ${maxMentions} упоминаний в сообщении`);
+    }
+    if ((text.match(/\n/g) || []).length > maxNewlines) {
+      throw new MessageError('too_many_newlines', 'Слишком много переносов строк');
+    }
+    if (!text && imageCount === 0 && $('video').length === 0) {
+      throw new MessageError('empty', 'Сообщение пустое');
+    }
+
+    return {
+      html: sanitized,
+      text,
+      clientId,
+      meta: {
+        images: imageCount,
+        links: linkCount,
+        mentions: mentionCount,
+        hasMedia: imageCount > 0 || $('video').length > 0,
+      },
+    };
+  }
+
+  function sanitizeUsername(usernameHtml, fallbackUsername) {
+    return extractUsernameMeta(usernameHtml, fallbackUsername);
+  }
+
+  return {
+    sanitizeMessage,
+    sanitizeUsername,
+    extractText,
+    isAllowedMediaUrl: (value) => isAllowedMediaUrl(value, { allowExternalImages }),
+  };
+}
