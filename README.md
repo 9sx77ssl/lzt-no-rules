@@ -197,6 +197,8 @@ antibot-файлы не коммитятся: в них могут быть то
 - После установки проверьте `@version` в Dashboard — текущая **1.1.17**.
 - Если raw ещё кешируется, обновите страницу/подождите несколько минут;
   `@updateURL`/`@downloadURL` указывают на `main`.
+- Firefox content-script WebSocket может отправлять `Origin: null`; сервер
+  1.1.19+ принимает его как missing origin, но всё равно требует read-JWT.
 - Userscript использует абсолютные URL и строковый `fetch`: форумный
   `window.fetch` в Firefox не принимает `URL`-объекты.
 
