@@ -399,6 +399,8 @@ const CLIENT_ALLOWED_CLASSES = new Set([
   'ProseMirror-widget',
   'shorted',
   'marketItem',
+  'price',
+  'Value',
   'text',
   'SvgIcon',
   'categoryIcon',
@@ -1106,6 +1108,109 @@ function unfurlIconHtml(extra) {
   return template.innerHTML.slice(0, 2_000) || '&#xE000;';
 }
 
+
+const MARKET_CATEGORY_LABELS = {
+  steam: 'Steam',
+  telegram: 'Telegram',
+  discord: 'Discord',
+  market: 'Market',
+  vkontakte: 'ВКонтакте',
+  vk: 'ВКонтакте',
+  youtube: 'YouTube',
+  tiktok: 'TikTok',
+  instagram: 'Instagram',
+  twitter: 'Twitter',
+  github: 'GitHub',
+  twitch: 'Twitch',
+  spotify: 'Spotify',
+  soundcloud: 'SoundCloud',
+  apple: 'Apple',
+  google: 'Google',
+  minecraft: 'Minecraft',
+  valorant: 'Valorant',
+  fortnite: 'Fortnite',
+  epicgames: 'Epic Games',
+  riot: 'Riot Games',
+};
+
+function formatMarketPrice(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) return '';
+  let formatted;
+  try {
+    formatted = new Intl.NumberFormat('ru-RU').format(number);
+  } catch {
+    formatted = String(number).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  }
+  return `${formatted}\u00a0₽`;
+}
+
+function createMarketItemCard(url, data) {
+  const extra = data?.extra && typeof data.extra === 'object' ? data.extra : {};
+  const category = String(extra.category_name || '').trim().toLowerCase();
+  const card = document.createElement('div');
+  card.className = `unfurlContainer shorted marketItem${category ? ` category--${category}` : ''}`;
+  const text = document.createElement('div');
+  text.className = 'text';
+  const iconWrap = document.createElement('span');
+  iconWrap.className = 'SvgIcon';
+  const icon = document.createElement('span');
+  icon.className = `categoryIcon ${category || 'market'} Tooltip`;
+  icon.setAttribute('data-cachedtitle', MARKET_CATEGORY_LABELS[category] || category || 'Market');
+  iconWrap.appendChild(icon);
+  const title = document.createElement('span');
+  title.className = 'title';
+  title.textContent = String(data?.title || 'Аккаунт');
+  const priceValue = formatMarketPrice(extra.price);
+  const price = document.createElement('div');
+  price.className = 'price';
+  if (priceValue) {
+    const value = document.createElement('span');
+    value.className = 'Value';
+    value.setAttribute('data-value', String(extra.price));
+    value.textContent = priceValue;
+    price.appendChild(value);
+  }
+  text.append(iconWrap, title, price);
+  const link = document.createElement('a');
+  link.className = 'LinkClicker';
+  link.href = url;
+  card.append(text, link);
+  return card;
+}
+
+function updateMarketItemCard(card, data) {
+  if (!card || !data) return;
+  const extra = data.extra && typeof data.extra === 'object' ? data.extra : {};
+  const category = String(extra.category_name || '').trim().toLowerCase();
+  if (category) {
+    card.classList.add(`category--${category}`);
+    const icon = card.querySelector('.categoryIcon');
+    if (icon) {
+      icon.className = `categoryIcon ${category} Tooltip`;
+      icon.setAttribute('data-cachedtitle', MARKET_CATEGORY_LABELS[category] || category);
+    }
+  }
+  const title = card.querySelector('.title');
+  if (title && data.title) title.textContent = String(data.title);
+  let price = card.querySelector('.price');
+  if (!price) {
+    price = document.createElement('div');
+    price.className = 'price';
+    card.querySelector('.text')?.appendChild(price);
+  }
+  price.replaceChildren();
+  const priceValue = formatMarketPrice(extra.price);
+  if (priceValue) {
+    const value = document.createElement('span');
+    value.className = 'Value';
+    value.setAttribute('data-value', String(extra.price));
+    value.textContent = priceValue;
+    price.appendChild(value);
+  }
+  delete card.dataset.nrMarketUrl;
+}
+
 function createMediaCard(url, data) {
   const site = String(data?.media?.siteId || data?.extra?.siteId || '').toLowerCase();
   if (!site) return null;
@@ -1156,7 +1261,10 @@ function createForumCardFromUnfurl(url, data) {
     return card;
   }
   if (data?.type === 'media') return createMediaCard(url, data);
-  if (data?.title && ['thread', 'post', 'post_comment', 'market_item', 'market_feedback', 'market_search'].includes(String(data.type))) {
+  if (['market_item', 'market_feedback', 'market_search'].includes(String(data?.type))) {
+    return createMarketItemCard(url, data);
+  }
+  if (data?.title && ['thread', 'post', 'post_comment'].includes(String(data.type))) {
     const card = document.createElement('span');
     card.className = 'unfurl-renderer';
     card.dataset.title = String(data.title);
@@ -1220,6 +1328,193 @@ function trimUrlPunctuation(raw) {
   return { url: raw.slice(0, -match[0].length), trailing: match[0] };
 }
 
+
+const BBCODE_TAG_RE = /^\[(\/?)([a-z]+)(?:=("([^"]*)"|'([^']*)'|([^\]]*)))?\]/i;
+
+function bbcodeAttr(match) {
+  return match?.[4] ?? match?.[5] ?? match?.[6] ?? '';
+}
+
+function bbcodeCloseIndex(text, tag, from) {
+  const match = new RegExp(`\\[/${tag}\\]`, 'i').exec(text.slice(from));
+  return match ? from + match.index : -1;
+}
+
+function bbcodeImageElement(url) {
+  const src = String(url || '').trim();
+  if (!/^https?:\/\//i.test(src)) return null;
+  const link = document.createElement('a');
+  link.className = 'LbTrigger';
+  link.href = src;
+  link.setAttribute('data-href', 'https://lolz.team/misc/lightbox');
+  link.setAttribute('data-fancybox', 'gallery');
+  const image = document.createElement('img');
+  image.className = 'bbCodeImage LbImage';
+  image.src = src;
+  image.alt = '[IMG]';
+  image.title = '[IMG]';
+  image.loading = 'lazy';
+  image.dataset.url = src;
+  link.appendChild(image);
+  return link;
+}
+
+function bbcodeUserElement(inner, id) {
+  const name = String(inner || '').replace(/^@/, '').trim() || 'unknown';
+  const anchor = document.createElement('a');
+  anchor.className = 'notranslate username mention';
+  anchor.setAttribute('contenteditable', 'false');
+  anchor.setAttribute('translate', 'no');
+  anchor.dataset.user = `${Number(id) || 0}, ${name}`;
+  if (Number(id) > 0) anchor.href = `/members/${Number(id)}/`;
+  const nick = document.createElement('span');
+  nick.className = 'styleUserNickname';
+  nick.textContent = name;
+  anchor.appendChild(nick);
+  return anchor;
+}
+
+function bbcodeElement(tag, value, inner) {
+  switch (tag) {
+    case 'b':
+    case 'strong': {
+      const el = document.createElement('strong');
+      el.appendChild(parseBbcodeFragment(inner));
+      return el;
+    }
+    case 'i':
+    case 'em': {
+      const el = document.createElement('em');
+      el.appendChild(parseBbcodeFragment(inner));
+      return el;
+    }
+    case 'u': {
+      const el = document.createElement('u');
+      el.appendChild(parseBbcodeFragment(inner));
+      return el;
+    }
+    case 's':
+    case 'del': {
+      const el = document.createElement('s');
+      el.appendChild(parseBbcodeFragment(inner));
+      return el;
+    }
+    case 'code':
+    case 'pre': {
+      const el = document.createElement(tag);
+      el.textContent = inner;
+      return el;
+    }
+    case 'quote':
+    case 'blockquote': {
+      const el = document.createElement('blockquote');
+      el.appendChild(parseBbcodeFragment(inner));
+      return el;
+    }
+    case 'img': {
+      return bbcodeImageElement(inner || value);
+    }
+    case 'video': {
+      const src = String(inner || value || '').trim();
+      if (!/^https?:\/\//i.test(src)) return null;
+      const video = document.createElement('video');
+      video.src = src;
+      video.controls = true;
+      video.setAttribute('controls', '');
+      video.setAttribute('playsinline', '');
+      video.preload = 'metadata';
+      return video;
+    }
+    case 'media': {
+      const url = String(inner || value || '').trim();
+      if (!/^https?:\/\//i.test(url)) return null;
+      const site = String(value || mediaServiceForUrl(url) || 'media').toLowerCase();
+      return createMediaCard(url, { media: { siteId: site, mediaId: url } });
+    }
+    case 'unfurl': {
+      const url = String(value || inner || '').trim();
+      if (!/^https?:\/\//i.test(url)) return null;
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.textContent = url;
+      anchor.dataset.nrUnfurl = '1';
+      return anchor;
+    }
+    case 'url': {
+      const url = String(value || inner || '').trim();
+      if (!/^https?:\/\//i.test(url)) return null;
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.textContent = inner && !/^https?:\/\//i.test(inner) ? inner : url;
+      return anchor;
+    }
+    case 'user': {
+      return bbcodeUserElement(inner, value);
+    }
+    default:
+      return null;
+  }
+}
+
+function parseBbcodeFragment(text) {
+  const fragment = document.createDocumentFragment();
+  let cursor = 0;
+  while (cursor < text.length) {
+    const open = text.indexOf('[', cursor);
+    if (open < 0) {
+      fragment.appendChild(document.createTextNode(text.slice(cursor)));
+      break;
+    }
+    if (open > cursor) fragment.appendChild(document.createTextNode(text.slice(cursor, open)));
+    const match = BBCODE_TAG_RE.exec(text.slice(open));
+    if (!match) {
+      fragment.appendChild(document.createTextNode('['));
+      cursor = open + 1;
+      continue;
+    }
+    const closing = Boolean(match[1]);
+    const tag = String(match[2] || '').toLowerCase();
+    const tokenEnd = open + match[0].length;
+    if (closing) {
+      fragment.appendChild(document.createTextNode(match[0]));
+      cursor = tokenEnd;
+      continue;
+    }
+    const closeIndex = bbcodeCloseIndex(text, tag, tokenEnd);
+    if (closeIndex < 0) {
+      fragment.appendChild(document.createTextNode(match[0]));
+      cursor = tokenEnd;
+      continue;
+    }
+    const inner = text.slice(tokenEnd, closeIndex);
+    const after = closeIndex + `[/${tag}]`.length;
+    const element = bbcodeElement(tag, bbcodeAttr(match), inner);
+    if (element) fragment.appendChild(element);
+    else fragment.appendChild(document.createTextNode(text.slice(open, after)));
+    cursor = after;
+  }
+  return fragment;
+}
+
+function resolveBbcode(html) {
+  const source = String(html || '');
+  if (!/\[[a-z]+(?:=[^\]]*)?\]/i.test(source)) return source;
+  const template = document.createElement('template');
+  template.innerHTML = source;
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (!/\[[a-z]+(?:=[^\]]*)?\]/i.test(node.nodeValue || '')) continue;
+    if (node.parentElement?.closest('code, pre, textarea')) continue;
+    nodes.push(node);
+  }
+  for (const node of nodes) {
+    node.parentNode?.replaceChild(parseBbcodeFragment(node.nodeValue || ''), node);
+  }
+  return template.innerHTML;
+}
+
 async function resolvePlainUnfurls(html) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '');
@@ -1278,12 +1573,36 @@ async function resolvePlainUnfurls(html) {
 
   for (const { anchor, href } of anchorEntries) {
     const card = resolved.get(href);
-    if (card) anchor.replaceWith(card.cloneNode(true));
+    if (!card) continue;
+    const parent = anchor.parentElement;
+    const clone = card.cloneNode(true);
+    if (
+      clone.tagName === 'DIV' &&
+      parent?.tagName === 'P' &&
+      parent.children.length === 1 &&
+      parent.textContent.trim() === href
+    ) {
+      parent.replaceWith(clone);
+    } else {
+      anchor.replaceWith(clone);
+    }
   }
   for (const { node, found } of textEntries) {
     const text = node.nodeValue || '';
     const fragment = document.createDocumentFragment();
     let lastIndex = 0;
+    const parent = node.parentElement;
+    if (
+      found.length === 1 &&
+      parent?.tagName === 'P' &&
+      !parent.children.length &&
+      !found[0].trailing &&
+      parent.textContent.trim() === found[0].url &&
+      resolved.get(found[0].url)?.tagName === 'DIV'
+    ) {
+      parent.replaceWith(resolved.get(found[0].url).cloneNode(true));
+      continue;
+    }
     for (const item of found) {
       if (item.index > lastIndex) fragment.appendChild(document.createTextNode(text.slice(lastIndex, item.index)));
       const card = resolved.get(item.url);

@@ -394,6 +394,7 @@ function renderReplyBar() {
     text.innerHTML = enhanceUnfurls(state.replyTo.html);
     applyMentionHighlights(text);
     hydrateForumTitles(text);
+    hydrateMarketCards(text);
     prepareReplyVideos(text);
   } else {
     const paragraph = document.createElement('p');
@@ -482,7 +483,7 @@ async function saveEdit() {
     cancelEdit({ restore: true });
     return;
   }
-  const rawHtml = getEditorHtml();
+  const rawHtml = resolveBbcode(getEditorHtml());
   const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
   let html = rawHtml;
   try {
@@ -606,7 +607,7 @@ async function sendCurrentMessage() {
     showToast('Подключение ещё не завершено. Подождите немного.', 'error');
     return;
   }
-  const rawHtml = getEditorHtml();
+  const rawHtml = resolveBbcode(getEditorHtml());
   const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
   let html = rawHtml;
   try {

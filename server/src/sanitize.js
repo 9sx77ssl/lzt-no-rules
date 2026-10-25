@@ -356,6 +356,8 @@ const SAFE_MESSAGE_CLASSES = new Set([
   'ProseMirror-widget',
   'shorted',
   'marketItem',
+  'price',
+  'Value',
   'text',
   'telegram',
   'steam',

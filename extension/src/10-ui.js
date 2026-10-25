@@ -113,6 +113,72 @@ const NR_CSS = `
 }
 #no-rules-editing .chat2-replying-text video { max-height: 120px; }
 
+/* Native legacy market/account card (lzt.market item). */
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurlContainer.shorted.marketItem {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 6px;
+  margin: 2px 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background-color: rgba(140, 162, 154, 0.2);
+  color: var(--contentText);
+  line-height: 20px;
+  vertical-align: middle;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurlContainer.shorted.marketItem .text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurlContainer.shorted.marketItem .SvgIcon {
+  display: flex;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurlContainer.shorted.marketItem .categoryIcon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurlContainer.shorted.marketItem .title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--contentText);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurlContainer.shorted.marketItem .price {
+  display: flex;
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--contentText);
+  line-height: 20px;
+  white-space: nowrap;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurlContainer.shorted.marketItem .Value {
+  font-weight: 700;
+  line-height: 20px;
+  white-space: nowrap;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurlContainer.shorted.marketItem .LinkClicker {
+  position: absolute;
+  inset: 0;
+}
+
 /* Native unfurl renderer CSS lives inside the Tiptap lazy chunk. After a
    reload there may be no unfurl node in the composer, so the old messages
    would lose their forum/media card styling. Copy the native rules here. */
@@ -1034,6 +1100,7 @@ const MARKET_CATEGORIES = new Map([
 ]);
 
 const FORUM_TITLE_CACHE = new Map();
+const MARKET_CARD_CACHE = new Map();
 
 function slugTitle(value) {
   const known = { contests: 'Розыгрыши' };
@@ -1065,6 +1132,10 @@ function marketCardFor(href) {
     title = MARKET_CATEGORIES.get(parts[0]);
   } else if (parts[0] === 'user' && parts[2] === 'items') {
     title = 'Товары пользователя';
+  } else if (parts.length === 1 && /^\d+$/.test(parts[0])) {
+    const card = createMarketItemCard(href, { title: `Аккаунт ${parts[0]}`, extra: {} });
+    card.dataset.nrMarketUrl = href;
+    return card;
   } else {
     return null;
   }
@@ -1160,7 +1231,7 @@ function applyMentionHighlights(root) {
 
 function enhanceUnfurls(html) {
   const pre = document.createElement('template');
-  pre.innerHTML = sanitizeClientHtml(html);
+  pre.innerHTML = resolveBbcode(sanitizeClientHtml(html));
   // Tiptap can persist an autolink mark as <a>text</a> without href.
   for (const anchor of [...pre.content.querySelectorAll('a:not([href])')]) {
     if (anchor.closest('.mention, .unfurlContainer, .internalNodeLink, .node-unfurl, .node-media, .unfurl-renderer, .embed-link, .LbTrigger')) continue;
@@ -1180,7 +1251,18 @@ function enhanceUnfurls(html) {
     const href = anchor.getAttribute('href') || '';
     if (!href) continue;
     const card = mediaCardFor(href) || marketCardFor(href) || forumCardFor(href);
-    if (card) anchor.replaceWith(card);
+    if (!card) continue;
+    const parent = anchor.parentElement;
+    if (
+      card.tagName === 'DIV' &&
+      parent?.tagName === 'P' &&
+      parent.children.length === 1 &&
+      parent.textContent.trim() === href
+    ) {
+      parent.replaceWith(card);
+    } else {
+      anchor.replaceWith(card);
+    }
   }
   return template.innerHTML;
 }
@@ -1268,6 +1350,26 @@ function muteEditorVideos() {
   }
 }
 
+function hydrateMarketCards(root) {
+  for (const card of root.querySelectorAll('[data-nr-market-url]')) {
+    const href = card.dataset.nrMarketUrl;
+    if (!href) continue;
+    const cached = MARKET_CARD_CACHE.get(href);
+    if (cached) {
+      updateMarketItemCard(card, cached);
+      continue;
+    }
+    getForumApiToken()
+      .then((token) => fetchForumUnfurl(href, token))
+      .then((data) => {
+        if (!data || !['market_item', 'market_feedback', 'market_search'].includes(String(data.type))) return;
+        MARKET_CARD_CACHE.set(href, data);
+        updateMarketItemCard(card, data);
+      })
+      .catch(() => {});
+  }
+}
+
 function createMessageElement(message, { showHeader = true } = {}) {
   const wrapper = document.createElement('div');
   wrapper.dataset.messageId = String(message.id);
@@ -1327,6 +1429,7 @@ function createMessageElement(message, { showHeader = true } = {}) {
       text.innerHTML = enhanceUnfurls(message.reply.html);
       applyMentionHighlights(text);
       hydrateForumTitles(text);
+      hydrateMarketCards(text);
       prepareReplyVideos(text);
     } else {
       const paragraph = document.createElement('p');
@@ -1354,6 +1457,7 @@ function createMessageElement(message, { showHeader = true } = {}) {
       inner.innerHTML = html;
       applyMentionHighlights(inner);
       hydrateForumTitles(inner);
+      hydrateMarketCards(inner);
     } else {
       inner.textContent = message.text || '';
     }
@@ -1705,9 +1809,7 @@ function htmlToBbcode(html) {
       const link = element.querySelector('a.unfurl-wrapper, a[href]');
       const href = absoluteForumUrl(forum?.getAttribute('href') || link?.getAttribute('href'));
       if (href) {
-        return forum
-          ? `[UNFURL="${href}"]${href}[/UNFURL]`
-          : `[unfurl="${href}"]${href}[/unfurl]`;
+        return `[UNFURL="${href}"]${href}[/UNFURL]`;
       }
     }
     if (tag === 'br') return '\n';
@@ -1723,6 +1825,9 @@ function htmlToBbcode(html) {
       const src = element.getAttribute('src') || element.querySelector('source')?.getAttribute('src') || '';
       return src ? `[VIDEO]${src}[/VIDEO]` : '';
     }
+    if (tag === 'a' && element.classList.contains('LbTrigger')) {
+      return [...element.childNodes].map(render).join('');
+    }
     if (tag === 'a' && element.classList.contains('mention')) {
       const userId = Number(String(element.dataset.user || '').split(',')[0]);
       const name = element.querySelector('.styleUserNickname')?.textContent?.trim() || '';
@@ -1732,13 +1837,13 @@ function htmlToBbcode(html) {
       const href = absoluteForumUrl(element.getAttribute('href'));
       if (!href) return [...element.childNodes].map(render).join('');
       const text = [...element.childNodes].map(render).join('').trim();
-      if (!text || text === href) return `[unfurl="${href}"]${href}[/unfurl]`;
+      if (!text || text === href) return `[UNFURL="${href}"]${href}[/UNFURL]`;
       return `[URL=${href}]${text}[/URL]`;
     }
     if (element.classList.contains('unfurlContainer')) {
       const link = element.querySelector('a.LinkClicker, a[href]');
       const href = absoluteForumUrl(link?.getAttribute('href'));
-      if (href) return `[unfurl="${href}"]${href}[/unfurl]`;
+      if (href) return `[UNFURL="${href}"]${href}[/UNFURL]`;
     }
     if (element.classList.contains('internalNodeLink')) {
       const link = element.querySelector('a.internalLinkClicker, a[href]');
