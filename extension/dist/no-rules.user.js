@@ -1249,6 +1249,8 @@ async function resolvePlainUnfurls(html) {
     if (anchor.closest('.mention, .unfurlContainer, .internalNodeLink, .node-unfurl, .node-media, .unfurl-renderer, .embed-link, .LbTrigger')) continue;
     const href = anchor.getAttribute('href') || '';
     if (!/^https?:\/\//i.test(href)) continue;
+    const label = (anchor.textContent || '').trim();
+    if (label && label !== href && !anchor.hasAttribute('data-href')) continue;
     candidates.set(href, href);
     anchorEntries.push({ anchor, href });
   }
