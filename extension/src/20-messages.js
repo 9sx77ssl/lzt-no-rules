@@ -53,13 +53,28 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
   const previousHeight = scroll?.scrollHeight || 0;
   const wasNearBottom = isNearBottom();
 
-  container.replaceChildren();
+  const existingMessages = new Map();
+  for (const element of container.querySelectorAll('[data-nr-message]')) {
+    const id = element.dataset.messageId;
+    if (id) existingMessages.set(id, element);
+  }
+  const renderMessage = (message, showHeader) => {
+    const id = String(message.id);
+    const key = messageRenderKey(message, showHeader);
+    const existing = existingMessages.get(id);
+    existingMessages.delete(id);
+    if (existing && existing.dataset.nrRenderKey === key) return existing;
+    const element = createMessageElement(message, { showHeader });
+    element.dataset.nrRenderKey = key;
+    return element;
+  };
 
+  const rendered = [];
   if (state.historyLoading && state.historyHasMore) {
     const loading = document.createElement('div');
     loading.className = 'nr-loading-top';
     loading.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Загрузка истории…';
-    container.appendChild(loading);
+    rendered.push(loading);
   }
 
   const messages = allVisibleMessages();
@@ -92,16 +107,18 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
       const separatorLabel = group.dayKey !== lastDay
         ? dayLabel(new Date(first.createdAt || Date.now()))
         : null;
-      container.appendChild(
+      rendered.push(
         createGroup(group.messages, {
           dayLabel: separatorLabel,
           tagged: group.tagged,
+          renderMessage,
         }),
       );
       lastDay = group.dayKey;
     }
   }
 
+  container.replaceChildren(...rendered);
   prepareMessageVideos(container);
   activateNativeContent(container);
   renderTypingInto(container);
@@ -562,6 +579,21 @@ function removePending(clientId) {
   state.pending.delete(clientId);
   state.outbox = state.outbox.filter((payload) => payload.clientId !== clientId);
   if (state.active) renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
+}
+
+function editLastOwnMessage() {
+  const own = allVisibleMessages().filter(
+    (message) =>
+      message.user?.id === state.user?.id &&
+      !message.deleted &&
+      !message.pending &&
+      !message.failed &&
+      !message.queued,
+  );
+  const last = own.at(-1);
+  if (!last) return false;
+  startEdit(last);
+  return true;
 }
 
 async function sendCurrentMessage() {

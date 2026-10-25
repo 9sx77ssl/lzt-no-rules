@@ -969,7 +969,30 @@ function createDaySeparator(label) {
   return day;
 }
 
-function createGroup(messages, { dayLabel = null, tagged = false } = {}) {
+function messageRenderKey(message, showHeader) {
+  return JSON.stringify([
+    message.id,
+    message.html,
+    message.text,
+    message.createdAt,
+    message.editedAt || null,
+    Boolean(message.deleted),
+    Boolean(message.pending),
+    Boolean(message.failed),
+    Boolean(message.queued),
+    showHeader,
+    message.user?.id,
+    message.user?.username,
+    message.user?.usernameHtml,
+    message.reply?.id || null,
+    message.reply?.text || '',
+    message.reply?.html || '',
+    Boolean(message.reply?.deleted),
+    messageMentionsMe(message),
+  ]);
+}
+
+function createGroup(messages, { dayLabel = null, tagged = false, renderMessage = null } = {}) {
   const first = messages[0];
   const group = document.createElement('div');
   group.className = state.templates?.group || `chat2-message-group ${HASH.footer}`;
@@ -981,7 +1004,11 @@ function createGroup(messages, { dayLabel = null, tagged = false } = {}) {
   if (dayLabel) content.appendChild(createDaySeparator(dayLabel));
 
   messages.forEach((message, index) => {
-    content.appendChild(createMessageElement(message, { showHeader: index === 0 }));
+    content.appendChild(
+      renderMessage
+        ? renderMessage(message, index === 0)
+        : createMessageElement(message, { showHeader: index === 0 }),
+    );
   });
   group.appendChild(content);
   return group;
@@ -1201,7 +1228,9 @@ function prepareMessageVideos(root) {
 }
 
 function activateNativeContent(root) {
-  if (!root || !root.querySelector?.('video')) return;
+  if (!root) return;
+  const videos = [...root.querySelectorAll('video')];
+  if (!videos.some((video) => !video.closest('[data-lzt-video-player]'))) return;
   const xf = PAGE_WINDOW?.XenForo || window.XenForo;
   if (!xf || typeof xf.activate !== 'function') return;
   try {

@@ -231,6 +231,23 @@ function onDocumentKeydownCapture(event) {
   const editor = target?.closest('.chat2-footer .tiptap');
 
   if (state.active && editor) {
+    if (
+      event.key === 'ArrowUp' &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !event.isComposing &&
+      !mentionPopupIsOpen() &&
+      !editor.querySelector('.svelte-renderer')
+    ) {
+      if (editLastOwnMessage()) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        return;
+      }
+    }
     if (event.key === 'Enter') {
       if (event.isComposing || event.keyCode === 229) return;
       if (event.shiftKey) return;
