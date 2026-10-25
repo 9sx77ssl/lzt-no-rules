@@ -102,6 +102,7 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
     }
   }
 
+  prepareMessageVideos(container);
   activateNativeContent(container);
   renderTypingInto(container);
 

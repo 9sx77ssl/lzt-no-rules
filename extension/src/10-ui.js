@@ -1185,6 +1185,21 @@ function hydrateForumTitles(root) {
 }
 
 
+function prepareMessageVideos(root) {
+  if (!root) return;
+  for (const video of root.querySelectorAll('video')) {
+    if (video.closest('[data-lzt-video-player]')) continue;
+    video.setAttribute('playsinline', '');
+    video.preload = 'metadata';
+    if (!video.getAttribute('poster')) {
+      const src = video.getAttribute('src') || video.querySelector('source')?.src || '';
+      if (/^https:\/\/nztcdn\.com\/files\//i.test(src)) {
+        video.setAttribute('poster', src.replace(/\.[^./?]+(?:\?.*)?$/, '.webp'));
+      }
+    }
+  }
+}
+
 function activateNativeContent(root) {
   if (!root || !root.querySelector?.('video')) return;
   const xf = PAGE_WINDOW?.XenForo || window.XenForo;
