@@ -1136,7 +1136,8 @@ function installMessageListeners(container) {
       event.preventDefault();
       event.stopPropagation();
       const group = avatar.closest('.chat2-message-group');
-      const wrapper = group?.querySelector('[data-nr-message]');
+      const wrappers = group ? [...group.querySelectorAll('[data-nr-message]')] : [];
+      const wrapper = wrappers.at(-1);
       const message = wrapper ? findMessageByElement(wrapper) : null;
       if (message && !message.deleted && !message.pending) startReply(message);
     }
@@ -1148,7 +1149,8 @@ function installMessageListeners(container) {
     if (!avatar) return;
     event.preventDefault();
     const group = avatar.closest('.chat2-message-group');
-    const wrapper = group?.querySelector('[data-nr-message]');
+    const wrappers = group ? [...group.querySelectorAll('[data-nr-message]')] : [];
+    const wrapper = wrappers.at(-1);
     const message = wrapper ? findMessageByElement(wrapper) : null;
     if (message && !message.deleted && !message.pending) startReply(message);
   });
