@@ -118,8 +118,6 @@ const state = {
   enforceTimer: null,
   renderTimer: null,
   menuEl: null,
-  toastEl: null,
-  toastTimer: null,
   roomLink: null,
   socketEl: null,
   nativeSocketEl: null,
@@ -625,6 +623,69 @@ function sanitizeClientHtml(html) {
   return template.innerHTML;
 }
 
+const URL_TEXT_RE = /https?:\/\/[^\s<>"'`]+/gi;
+
+function linkifyHtml(html) {
+  const template = document.createElement('template');
+  template.innerHTML = String(html || '');
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  for (const node of textNodes) {
+    const parent = node.parentElement;
+    if (
+      !parent ||
+      parent.closest('a, code, pre, abbr, .unfurlContainer, .internalNodeLink, .Tooltip, .SvgIcon')
+    ) {
+      continue;
+    }
+    const text = node.nodeValue || '';
+    if (!URL_TEXT_RE.test(text)) continue;
+    URL_TEXT_RE.lastIndex = 0;
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+    let match;
+    while ((match = URL_TEXT_RE.exec(text))) {
+      const raw = match[0];
+      const trailing = raw.match(/[.,;:!?)\]]+$/);
+      const url = trailing ? raw.slice(0, -trailing[0].length) : raw;
+      if (!url || !/^https?:\/\//i.test(url)) continue;
+      if (match.index > lastIndex) {
+        fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+      }
+      const anchor = document.createElement('a');
+      let host = '';
+      try {
+        host = new URL(url).hostname.toLowerCase();
+      } catch {
+        // keep as text
+      }
+      if (!host) {
+        fragment.appendChild(document.createTextNode(raw));
+      } else {
+        const internal = /(^|\.)(lolz\.(team|live|guru)|zelenka\.guru|lzt\.market)$/.test(host);
+        anchor.href = url;
+        anchor.textContent = url;
+        anchor.className = internal ? 'internalLink' : 'externalLink ProxyLink';
+        if (!internal) {
+          anchor.target = '_blank';
+          anchor.rel = 'nofollow noopener';
+          anchor.dataset.proxyHref = url;
+        }
+        fragment.appendChild(anchor);
+      }
+      if (trailing) fragment.appendChild(document.createTextNode(trailing[0]));
+      lastIndex = match.index + raw.length;
+    }
+    if (!fragment.childNodes.length) continue;
+    if (lastIndex < text.length) {
+      fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+    node.parentNode?.replaceChild(fragment, node);
+  }
+  return template.innerHTML;
+}
+
 function extractTextFromHtml(html) {
   const template = document.createElement('template');
   template.innerHTML = sanitizeClientHtml(html);
@@ -814,23 +875,12 @@ function throttle(fn, delay) {
 }
 
 function showToast(message, type = 'info') {
+  // The native Lolzteam Chatbox has no toast/notice stack. Keep diagnostics in
+  // the console only; never render our own transient UI over the chat.
   try {
-    if (!els.toast) {
-      const toast = document.createElement('div');
-      toast.className = 'nr-toast';
-      toast.setAttribute('role', 'status');
-      document.body.appendChild(toast);
-      els.toast = toast;
-    }
-    els.toast.textContent = String(message);
-    els.toast.dataset.type = type;
-    els.toast.classList.add('nr-toast-visible');
-    clearTimeout(state.toastTimer);
-    state.toastTimer = setTimeout(() => {
-      els.toast?.classList.remove('nr-toast-visible');
-    }, 2600);
+    console.debug(`[NoRules:${type}] ${String(message)}`);
   } catch {
-    // ignore UI errors
+    // ignore logging errors
   }
 }
 

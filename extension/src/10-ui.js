@@ -73,31 +73,6 @@ const NR_CSS = `
 #no-rules-messages .nr-highlight .chat2-message-block { box-shadow: 0 0 0 2px var(--primaryMedium, #2f8a5d); transition: box-shadow .2s ease; }
 #no-rules-messages .nr-swipe { transform: translateX(8px); transition: transform .12s ease; }
 
-.nr-toast {
-  position: fixed;
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%) translateY(16px);
-  max-width: min(520px, calc(100vw - 32px));
-  padding: 10px 15px;
-  border-radius: 8px;
-  border: 1px solid var(--primary, #2a2a2a);
-  background: var(--primaryDark, #1b211f);
-  color: var(--contentText, #d6d6d6);
-  font-size: 13px;
-  line-height: 1.35;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, .38);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 2147483000;
-  transition: opacity .18s ease, transform .18s ease;
-}
-.nr-toast.nr-toast-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
-.nr-toast[data-type="error"] { border-color: #ff6a70; color: #ffc0c2; }
-.nr-toast[data-type="success"] { border-color: #2f8a5d; color: #b6e7ce; }
-
-#no-rules-paused[hidden] { display: none !important; }
-
 .nr-room-unread {
   display: inline-flex;
   align-items: center;
@@ -905,7 +880,7 @@ function createMessageElement(message, { showHeader = true } = {}) {
     deleted.textContent = 'Сообщение удалено';
     inner.appendChild(deleted);
   } else {
-    const html = sanitizeClientHtml(message.html || '');
+    const html = linkifyHtml(sanitizeClientHtml(message.html || ''));
     if (html) {
       inner.innerHTML = html;
     } else {
@@ -1206,7 +1181,11 @@ function closeMenu() {
 }
 
 function showSystemMessage(text) {
-  showToast(text, 'info');
+  try {
+    console.debug(`[NoRules:system] ${String(text)}`);
+  } catch {
+    // ignore
+  }
 }
 
 function mediaServiceForUrl(value) {
@@ -1237,7 +1216,7 @@ function absoluteForumUrl(value) {
 
 function htmlToBbcode(html) {
   const template = document.createElement('template');
-  template.innerHTML = sanitizeClientHtml(html);
+  template.innerHTML = linkifyHtml(sanitizeClientHtml(html));
   const render = (node) => {
     if (node.nodeType === Node.TEXT_NODE) return node.nodeValue || '';
     if (node.nodeType !== Node.ELEMENT_NODE) return '';
