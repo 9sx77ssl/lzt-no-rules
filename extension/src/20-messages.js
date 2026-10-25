@@ -441,7 +441,7 @@ function renderEditBar() {
   const bar = document.createElement('div');
   bar.id = 'no-rules-editing';
   bar.className = `chat2-message-editing ${HASH.footer}`;
-  bar.appendChild(document.createTextNode('Редактирование сообщения'));
+  bar.appendChild(document.createTextNode('Редактирование сообщения '));
   const cancel = document.createElement('span');
   cancel.className = `chat2-cancel-editing ${HASH.footer}`;
   cancel.setAttribute('role', 'button');
