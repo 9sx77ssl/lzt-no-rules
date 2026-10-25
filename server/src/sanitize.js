@@ -67,6 +67,12 @@ export function isAllowedMediaUrl(value, { allowExternalImages = false } = {}) {
 
 export function extractText(html) {
   const $ = cheerio.load(String(html ?? ''), null, false);
+  $('a.mention, span.mention').each((_, element) => {
+    const name = $(element).find('.styleUserNickname').text().trim() ||
+      ($(element).attr('data-user') || '').split(',').slice(1).join(',').trim();
+    if (name) $(element).replaceWith(`@${name}`);
+  });
+  $('img.avatar').remove();
   $('img').each((_, element) => {
     const alt = $(element).attr('alt') || $(element).attr('title') || '';
     $(element).replaceWith(alt ? alt : '[изображение]');
@@ -261,6 +267,7 @@ export function extractUsernameMeta(usernameHtml, fallbackUsername = '') {
   const raw = typeof usernameHtml === 'string' ? usernameHtml : '';
   let username = String(fallbackUsername || '').trim();
   let style = '';
+  let nickClass = '';
   let iconHtml = '';
 
   if (raw) {
@@ -270,6 +277,10 @@ export function extractUsernameMeta(usernameHtml, fallbackUsername = '') {
       const text = nick.text().trim();
       if (text) username = text;
       style = sanitizeUsernameStyle(nick.attr('style') || '');
+      nickClass = String(nick.attr('class') || '')
+        .split(/\s+/)
+        .filter((value) => value === 'styleUserNickname' || /^style\d+$/.test(value))
+        .join(' ');
     } else {
       const text = $.root().text().trim();
       if (text) username = text;
@@ -289,9 +300,10 @@ export function extractUsernameMeta(usernameHtml, fallbackUsername = '') {
   if (!username) username = 'unknown';
   username = username.slice(0, 64);
   const color = colorFromStyle(style);
+  const classes = nickClass || 'styleUserNickname';
   const nickHtml = style
-    ? `<span class="styleUserNickname" style="${escapeHtml(style)}">${escapeHtml(username)}</span>`
-    : `<span class="styleUserNickname">${escapeHtml(username)}</span>`;
+    ? `<span class="${classes}" style="${escapeHtml(style)}">${escapeHtml(username)}</span>`
+    : `<span class="${classes}">${escapeHtml(username)}</span>`;
   return {
     username,
     color,
@@ -376,14 +388,17 @@ const SAFE_MESSAGE_CLASSES = new Set([
   'Tooltip',
   'KWMOver',
   'styleUserNickname',
+  'uniqUsernameIcon--custom',
   'username',
   'mention',
+  'highlight',
+  'alertAction',
   'notranslate',
   'userBanner',
   'nodeInfo',
 ]);
 
-const SAFE_MESSAGE_CLASS_RE = /^(?:node\d+|category--[a-z0-9_-]+|Av\d+s|lztng-[a-z0-9-]+|fa[a-z0-9-]*)$/i;
+const SAFE_MESSAGE_CLASS_RE = /^(?:node\d+|category--[a-z0-9_-]+|Av\d+s|lztng-[a-z0-9-]+|fa[a-z0-9-]*|style\d+)$/i;
 
 function sanitizeMessageClasses(html) {
   const $ = cheerio.load(String(html ?? ''), null, false);
@@ -434,6 +449,7 @@ export function createSanitizer(options = {}) {
     'abbr',
     'video',
     'source',
+    ...USERNAME_SVG_TAGS,
   ];
 
   const allowedAttributes = {
@@ -487,6 +503,7 @@ export function createSanitizer(options = {}) {
     div: ['class', 'data-href'],
     video: ['src', 'poster', 'controls', 'preload', 'class', 'width', 'height', 'muted', 'loop', 'playsinline'],
     source: ['src', 'type'],
+    ...USERNAME_SVG_ATTRIBUTES,
   };
 
   const allowedStyles = {
@@ -509,6 +526,7 @@ export function createSanitizer(options = {}) {
       '-webkit-background-clip': [/^(text|border-box|padding-box|content-box)$/i],
       'text-shadow': [/^[0-9a-z#.,%()\s-]{1,200}$/i],
       'font-weight': [/^(normal|bold|bolder|lighter|[1-9]00)$/i],
+      'white-space': [/^(normal|nowrap|pre|pre-wrap)$/i],
     },
   };
   allowedStyles.a = allowedStyles.span;
@@ -526,6 +544,7 @@ export function createSanitizer(options = {}) {
       allowedTags,
       allowedAttributes,
       allowedStyles,
+      parser: { lowerCaseAttributeNames: false, lowerCaseTags: false },
       allowedSchemes: ['http', 'https', 'mailto'],
       allowedSchemesByTag: {
         img: ['https'],
@@ -577,7 +596,7 @@ export function createSanitizer(options = {}) {
     }
 
     const $ = cheerio.load(sanitized, null, false);
-    const imageCount = $('img').not('.mceSmilie, .mceSmilieLarge').length;
+    const imageCount = $('img').not('.mceSmilie, .mceSmilieLarge, .avatar').length;
     const linkCount = $('a[href]').not('.mention').length;
     const mentionCount = $('a.mention, span.mention, a.username.mention').length;
     const text = extractText(sanitized);

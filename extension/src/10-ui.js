@@ -1029,6 +1029,10 @@ function createMessageElement(message, { showHeader = true } = {}) {
     const html = enhanceUnfurls(message.html || '');
     if (html) {
       inner.innerHTML = html;
+      for (const mention of inner.querySelectorAll('a.mention')) {
+        const userId = Number(String(mention.dataset.user || '').split(',')[0]);
+        mention.classList.toggle('highlight', Boolean(state.user?.id) && userId === state.user.id);
+      }
       hydrateForumTitles(inner);
     } else {
       inner.textContent = message.text || '';
@@ -1396,6 +1400,11 @@ function htmlToBbcode(html) {
     if (tag === 'video') {
       const src = element.getAttribute('src') || element.querySelector('source')?.getAttribute('src') || '';
       return src ? `[VIDEO]${src}[/VIDEO]` : '';
+    }
+    if (tag === 'a' && element.classList.contains('mention')) {
+      const userId = Number(String(element.dataset.user || '').split(',')[0]);
+      const name = element.querySelector('.styleUserNickname')?.textContent?.trim() || '';
+      return userId && name ? `[USER=${userId}]@${name}[/USER]` : (name ? `@${name}` : '');
     }
     if (tag === 'a') {
       const href = absoluteForumUrl(element.getAttribute('href'));

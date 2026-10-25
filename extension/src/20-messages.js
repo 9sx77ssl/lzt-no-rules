@@ -461,7 +461,7 @@ function renderEditBar() {
   footer.insertBefore(bar, inputBox);
 }
 
-function saveEdit() {
+async function saveEdit() {
   if (!state.editing) return;
   if (editorIsEmpty()) {
     showToast('Сообщение пустое', 'error');
@@ -473,8 +473,14 @@ function saveEdit() {
     cancelEdit({ restore: true });
     return;
   }
-  const html = getEditorHtml();
-  const text = getEditorText().trim() || extractTextFromHtml(html);
+  const rawHtml = getEditorHtml();
+  const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
+  let html = rawHtml;
+  try {
+    html = await resolvePlainMentions(rawHtml);
+  } catch {
+    html = rawHtml;
+  }
   const previous = { ...target };
   target.html = sanitizeClientHtml(html);
   target.text = text;
@@ -561,23 +567,28 @@ function removePending(clientId) {
   if (state.active) renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
 }
 
-function sendCurrentMessage() {
+async function sendCurrentMessage() {
   if (!state.active) return;
   if (state.editing) {
-    saveEdit();
-    return;
+    return saveEdit();
   }
   if (editorIsEmpty()) return;
   if (!state.user || state.authFailedPermanently) {
     showToast('Подключение ещё не завершено. Подождите немного.', 'error');
     return;
   }
-  const html = getEditorHtml();
+  const rawHtml = getEditorHtml();
+  const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
+  let html = rawHtml;
+  try {
+    html = await resolvePlainMentions(rawHtml);
+  } catch {
+    html = rawHtml;
+  }
   if (html.length > 24_000) {
     showToast('Сообщение слишком длинное', 'error');
     return;
   }
-  const text = getEditorText().trim() || extractTextFromHtml(html);
   const clientId = randomId();
   const reply = state.replyTo
     ? {

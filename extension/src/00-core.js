@@ -330,6 +330,7 @@ const CLIENT_ALLOWED_TAGS = new Set([
   'abbr',
   'video',
   'source',
+  ...USERNAME_ALLOWED_TAGS,
 ]);
 
 const CLIENT_ALLOWED_CLASSES = new Set([
@@ -345,6 +346,9 @@ const CLIENT_ALLOWED_CLASSES = new Set([
   'username',
   'mention',
   'styleUserNickname',
+  'uniqUsernameIcon--custom',
+  'highlight',
+  'alertAction',
   'notranslate',
   'Tooltip',
   'muted',
@@ -413,7 +417,7 @@ const CLIENT_ALLOWED_CLASSES = new Set([
   'bbCodeSpoiler',
 ]);
 
-const CLIENT_ALLOWED_CLASS_RE = /^(?:node\d+|category--[a-z0-9_-]+|Av\d+s|lztng-[a-z0-9-]+|fa[a-z0-9-]*)$/i;
+const CLIENT_ALLOWED_CLASS_RE = /^(?:node\d+|category--[a-z0-9_-]+|Av\d+s|lztng-[a-z0-9-]+|fa[a-z0-9-]*|style\d+)$/i;
 
 const CLIENT_ALLOWED_STYLE_PROPS = new Map([
   ['color', /^(#[0-9a-f]{3,8}|rgba?\([^)]{1,80}\)|hsla?\([^)]{1,80}\)|[a-z]{3,20})$/i],
@@ -424,6 +428,7 @@ const CLIENT_ALLOWED_STYLE_PROPS = new Map([
   ['-webkit-background-clip', /^(text|border-box|padding-box|content-box)$/i],
   ['text-shadow', /^[0-9a-z#.,%()\s-]{1,200}$/i],
   ['font-weight', /^(normal|bold|bolder|lighter|[1-9]00)$/i],
+  ['white-space', /^(normal|nowrap|pre|pre-wrap)$/i],
 ]);
 
 function sanitizeClientStyle(value) {
@@ -580,7 +585,12 @@ function sanitizeUsernameHtml(html) {
         }
         const classes = String(attribute.value || '')
           .split(/\s+/)
-          .filter((value) => value === 'styleUserNickname' || value === 'uniqUsernameIcon--custom');
+          .filter(
+            (value) =>
+              value === 'styleUserNickname' ||
+              value === 'uniqUsernameIcon--custom' ||
+              /^style\d+$/.test(value),
+          );
         if (classes.length) element.setAttribute('class', classes.join(' '));
         else element.removeAttribute(name);
         continue;
@@ -637,6 +647,25 @@ function sanitizeClientHtml(html) {
           );
         if (kept.length) element.className = kept.join(' ');
         else element.removeAttribute('class');
+      }
+    }
+    if (tag !== 'span' && USERNAME_ALLOWED_TAGS.has(tag)) {
+      for (const attribute of [...element.attributes]) {
+        const name = attribute.name;
+        const lower = name.toLowerCase();
+        if (
+          lower.startsWith('on') ||
+          lower === 'href' ||
+          lower === 'xlink:href' ||
+          lower === 'id' ||
+          !USERNAME_ALLOWED_ATTRIBUTES.has(lower)
+        ) {
+          element.removeAttribute(name);
+        }
+      }
+      if (tag === 'animate' || tag === 'animatetransform') {
+        const attributeName = String(element.getAttribute('attributeName') || '').toLowerCase();
+        if (!SAFE_ANIMATED_ATTRIBUTES.has(attributeName)) element.remove();
       }
     }
     if (tag === 'img') {
@@ -825,6 +854,151 @@ function insertEditorMention(user) {
     }
   }
   insertEditorText(`@${user?.username || 'unknown'} `);
+}
+
+const MENTION_CACHE = new Map();
+const MENTION_TEXT_RE = /(^|[\s([{])@([\p{L}\p{N}_-]{1,64})/gu;
+const DEFAULT_AVATAR_URL = 'https://lolz.team/styles/default/xenforo/avatars/avatar_s.png';
+
+async function findForumUser(token) {
+  const key = String(token || '').toLowerCase();
+  if (!key) return null;
+  if (MENTION_CACHE.has(key)) return MENTION_CACHE.get(key);
+  const promise = (async () => {
+    try {
+      const csrf = getCsrfToken();
+      if (!csrf) return null;
+      const body = new URLSearchParams();
+      body.append('q', token);
+      body.append('_xfRequestUri', location.pathname + location.search);
+      body.append('_xfNoRedirect', '1');
+      body.append('_xfToken', csrf);
+      body.append('_xfResponseType', 'json');
+      const response = await fetch('/members/find', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+          Accept: 'application/json',
+        },
+        body,
+      });
+      if (!response.ok) return null;
+      const json = await response.json();
+      const entries = Object.values(json?.results || {}).filter(
+        (entry) => entry && Number.isSafeInteger(Number(entry.user_id)),
+      );
+      const parse = (entry) => {
+        const doc = new DOMParser().parseFromString(String(entry?.username || ''), 'text/html');
+        const nick = doc.querySelector('.styleUserNickname');
+        const icon = doc.querySelector('.uniqUsernameIcon--custom');
+        const username = (nick?.textContent || '').trim();
+        return {
+          id: Number(entry.user_id),
+          username,
+          avatar: /^https:\/\//i.test(entry.avatar || '') ? entry.avatar : null,
+          usernameHtml: sanitizeUsernameHtml(`${nick?.outerHTML || ''}${icon?.outerHTML || ''}`),
+        };
+      };
+      const parsed = entries.map(parse).filter((entry) => entry.id && entry.username);
+      return (
+        parsed.find((entry) => entry.username === token) ||
+        parsed.find((entry) => entry.username.toLowerCase() === key) ||
+        null
+      );
+    } catch {
+      return null;
+    }
+  })();
+  MENTION_CACHE.set(key, promise);
+  const value = await promise;
+  MENTION_CACHE.set(key, value);
+  if (!value) setTimeout(() => MENTION_CACHE.delete(key), 60_000).unref?.();
+  return value;
+}
+
+function createMentionNode(user) {
+  const anchor = document.createElement('a');
+  anchor.className = `notranslate username mention${user.id === state.user?.id ? ' highlight' : ''}`;
+  anchor.href = `/members/${user.id}/`;
+  anchor.setAttribute('contenteditable', 'false');
+  anchor.setAttribute('translate', 'no');
+  anchor.style.whiteSpace = 'normal';
+  anchor.dataset.user = `${user.id}, ${user.username}`;
+  const avatar = document.createElement('img');
+  avatar.className = 'avatar';
+  avatar.alt = 'avatar';
+  avatar.loading = 'lazy';
+  avatar.src = user.avatar || DEFAULT_AVATAR_URL;
+  avatar.addEventListener('error', () => {
+    if (avatar.src !== DEFAULT_AVATAR_URL) avatar.src = DEFAULT_AVATAR_URL;
+  });
+  anchor.appendChild(avatar);
+  const html = user.usernameHtml ||
+    `<span class="styleUserNickname">${escapeHtml(user.username || 'unknown')}</span>`;
+  anchor.insertAdjacentHTML('beforeend', html);
+  return anchor;
+}
+
+async function resolvePlainMentions(html) {
+  const template = document.createElement('template');
+  template.innerHTML = String(html || '');
+  if (!template.innerHTML.includes('@')) return template.innerHTML;
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    if (
+      node.parentElement?.closest(
+        'a, code, pre, .mention, .unfurlContainer, .internalNodeLink, .node-unfurl, .node-media, .embed-link',
+      )
+    )
+      continue;
+    if (node.nodeValue?.includes('@')) nodes.push(node);
+  }
+  if (!nodes.length) return template.innerHTML;
+
+  const tokens = new Set();
+  for (const node of nodes) {
+    MENTION_TEXT_RE.lastIndex = 0;
+    let match;
+    while ((match = MENTION_TEXT_RE.exec(node.nodeValue || ''))) tokens.add(match[2]);
+  }
+  const resolved = new Map();
+  await Promise.all(
+    [...tokens].map(async (token) => {
+      resolved.set(token, await findForumUser(token));
+    }),
+  );
+
+  for (const node of nodes) {
+    const text = node.nodeValue || '';
+    MENTION_TEXT_RE.lastIndex = 0;
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+    let match;
+    while ((match = MENTION_TEXT_RE.exec(text))) {
+      const before = text.slice(lastIndex, match.index);
+      if (before) fragment.appendChild(document.createTextNode(before));
+      const prefix = match[1] || '';
+      if (prefix) fragment.appendChild(document.createTextNode(prefix));
+      const user = resolved.get(match[2]);
+      if (user) {
+        fragment.appendChild(document.createTextNode(''));
+        fragment.appendChild(createMentionNode(user));
+      } else {
+        fragment.appendChild(document.createTextNode(match[2] ? `@${match[2]}` : ''));
+      }
+      lastIndex = match.index + match[0].length;
+    }
+    if (!fragment.childNodes.length) continue;
+    if (lastIndex < text.length) {
+      fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+    node.parentNode?.replaceChild(fragment, node);
+  }
+  return template.innerHTML;
 }
 
 function getScrollElement() {
