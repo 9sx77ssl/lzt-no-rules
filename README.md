@@ -12,7 +12,7 @@ fancybox и XenForo video player.
 - Userscript:
   <https://raw.githubusercontent.com/9sx77ssl/lzt-no-rules/main/extension/dist/no-rules.user.js>
 - Репозиторий: <https://github.com/9sx77ssl/lzt-no-rules>
-- Текущая версия: **1.1.16**
+- Текущая версия: **1.1.17**
 
 > No Rules — не замена приватных чатов и не E2E-шифрование. Сообщения
 > лежат в SQLite на сервере и доступны администратору сервера. Пароль,
@@ -194,7 +194,7 @@ antibot-файлы не коммитятся: в них могут быть то
 - В Tampermonkey должна быть **одна** копия No Rules. Старые версии
   (`1.0.1`, `1.1.8`, копии с другим `@namespace`) нужно удалить: они
   конфликтуют, рисуют старый баннер и мешают auth.
-- После установки проверьте `@version` в Dashboard — текущая **1.1.16**.
+- После установки проверьте `@version` в Dashboard — текущая **1.1.17**.
 - Если raw ещё кешируется, обновите страницу/подождите несколько минут;
   `@updateURL`/`@downloadURL` указывают на `main`.
 - Userscript использует абсолютные URL и строковый `fetch`: форумный
@@ -228,7 +228,7 @@ curl -fsS http://127.0.0.1:8787/version
 
 ```bash
 cd server && bun install && cd ..
-NR_VERSION=1.1.16 \
+NR_VERSION=1.1.17 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs

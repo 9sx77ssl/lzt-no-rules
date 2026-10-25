@@ -168,8 +168,10 @@ export class AuthService {
     }
 
     const scopes = normalizeScopes(payload.scope);
-    if (scopes.length > 0 && !scopes.some((scope) => ['read', 'chatbox', 'basic'].includes(scope))) {
-      throw new AuthError('invalid_token', 'У токена нет нужных прав');
+    const hasReadScope = scopes.some((scope) => scope === 'read' || scope === 'chatbox');
+    const hasPostScope = scopes.includes('post');
+    if (scopes.length > 0 && (!hasReadScope || hasPostScope)) {
+      throw new AuthError('invalid_token', 'Для входа нужен read-only токен');
     }
 
     const cacheKey = sha256(token);

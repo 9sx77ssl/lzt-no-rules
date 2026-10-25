@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.17
+
+- Backend auth принимает только read/chatbox JWT и отклоняет scope `post`;
+  `basic post`-токен для `/editor/unfurl` остаётся client-side и на backend
+  не отправляется.
+
 ## 1.1.16
 
 - Нативный fancybox для фотографий: «голые» `<img>` оборачиваются в

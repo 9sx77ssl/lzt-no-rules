@@ -171,6 +171,28 @@ test('creates and resumes an opaque session without the forum token', async () =
   }
 });
 
+test('rejects a post-scoped temporary token', async () => {
+  const app = makeApp(async () => {
+    throw new Error('should not be called');
+  });
+  try {
+    const now = Math.floor(Date.now() / 1000);
+    const token = makeToken({
+      sub: 9252369,
+      iss: 'lzt',
+      exp: now + 3600,
+      iat: now,
+      scope: 'basic post',
+    });
+    await assert.rejects(
+      app.auth.verifyTemporaryToken(token, { ip: '127.0.0.1' }),
+      (error) => error instanceof AuthError && error.code === 'invalid_token',
+    );
+  } finally {
+    app.close();
+  }
+});
+
 test('rejects an expired temporary token', async () => {
   const app = makeApp(async () => {
     throw new Error('should not be called');
