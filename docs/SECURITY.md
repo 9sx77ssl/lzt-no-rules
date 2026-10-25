@@ -34,7 +34,7 @@ IP-адрес клиента (сервер видит его сам через C
 | Подмена картинок/трекеров | разрешены только `nztcdn.com` и форумные хосты, внешние картинки по умолчанию выключены |
 | Огромные сообщения/флуд кадрами | лимиты HTML/текста/байтов, `maxPayload` у WS, rate limit |
 | Чужие правки/удаления | проверка `message.user.id === ws.user.id` или `ADMIN_USER_IDS` |
-| Подделка Origin | `ALLOWED_ORIGINS`, проверка при handshake |
+| Подделка Origin | `ALLOWED_ORIGINS`, проверка при handshake; Firefox content-script `Origin: null` трактуется как missing origin, но auth всё равно требует read-JWT |
 | Утечка секретов в git | `.gitignore`, `.env` только на сервере, в репозитории `.env.example` |
 
 `ACCESS_KEY` **не является** границей безопасности: он встроен в публичный
