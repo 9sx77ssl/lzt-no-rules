@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   avatar_url TEXT,
   color TEXT,
   stats TEXT,
+  stats_updated_at INTEGER,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
   last_seen_at INTEGER
@@ -128,6 +129,7 @@ export function rowToUser(row) {
       trophies: 0,
       contests: 0,
     },
+    statsUpdatedAt: row.stats_updated_at || null,
     createdAt: row.created_at,
     lastSeenAt: row.last_seen_at || null,
   };
@@ -166,8 +168,11 @@ export function openDatabase({ path, logger }) {
   if (!userColumns.has('stats')) {
     db.exec('ALTER TABLE users ADD COLUMN stats TEXT');
   }
-  if (version <= 2) db.exec('PRAGMA user_version = 3');
-  else if (version > 3) {
+  if (!userColumns.has('stats_updated_at')) {
+    db.exec('ALTER TABLE users ADD COLUMN stats_updated_at INTEGER');
+  }
+  if (version <= 3) db.exec('PRAGMA user_version = 4');
+  else if (version > 4) {
     throw new Error(`Unsupported database schema version ${version}`);
   }
 
@@ -194,14 +199,15 @@ export function openDatabase({ path, logger }) {
 
   const stmts = {
     upsertUser: prepare(`
-      INSERT INTO users (user_id, username, username_html, avatar_url, color, stats, created_at, updated_at, last_seen_at)
-      VALUES (@user_id, @username, @username_html, @avatar_url, @color, @stats, @now, @now, @now)
+      INSERT INTO users (user_id, username, username_html, avatar_url, color, stats, stats_updated_at, created_at, updated_at, last_seen_at)
+      VALUES (@user_id, @username, @username_html, @avatar_url, @color, @stats, @now, @now, @now, @now)
       ON CONFLICT(user_id) DO UPDATE SET
         username = excluded.username,
         username_html = excluded.username_html,
         avatar_url = excluded.avatar_url,
         color = excluded.color,
         stats = excluded.stats,
+        stats_updated_at = excluded.stats_updated_at,
         updated_at = excluded.updated_at,
         last_seen_at = excluded.last_seen_at
     `),

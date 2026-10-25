@@ -274,6 +274,12 @@ export class AuthService {
       this.db.deleteSession(tokenHash);
       throw new AuthError('session_expired', 'Сессия истекла');
     }
+    if (!session.user.statsUpdatedAt) {
+      // Older sessions predate the profile-stat fields. Force one temporary
+      // token refresh so the online modal has the same counters as the forum.
+      this.db.deleteSession(tokenHash);
+      throw new AuthError('invalid_session', 'Сессия устарела, требуется повторный вход');
+    }
     this.assertAllowed(session.user);
     this.db.touchSession(tokenHash);
     this.db.touchUser(session.user.id);
