@@ -48,7 +48,7 @@ async function fetchTemporaryToken() {
   }
   const body = new URLSearchParams();
   body.append('scope[]', 'read');
-  body.append('_xfRequestUri', location.pathname + location.search);
+  body.append('_xfRequestUri', pagePath());
   body.append('_xfNoRedirect', '1');
   body.append('_xfToken', csrf);
   body.append('_xfResponseType', 'json');
@@ -57,7 +57,7 @@ async function fetchTemporaryToken() {
     let response;
     try {
       const origin = PAGE_WINDOW?.location?.origin || location.origin;
-      response = await fetch(new URL('/login/generate-temporary-token', origin).href, {
+      response = await pageFetch(new URL('/login/generate-temporary-token', origin).href, {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
@@ -240,7 +240,7 @@ async function connectNoRules({ forceToken = false, userInitiated = false } = {}
 function openNoRulesSocket(mode) {
   let ws;
   try {
-    ws = new WebSocket(BUILD.wsUrl);
+    ws = createPageWebSocket(BUILD.wsUrl);
   } catch {
     state.connectionError = 'Не удалось открыть соединение с No Rules.';
     setWsState('disconnected');

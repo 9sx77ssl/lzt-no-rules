@@ -491,15 +491,19 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
     }
 
     const origin = req.headers.origin;
-    if (origin) {
-      if (!config.allowedOrigins.includes(origin)) {
-        logger.warn('ws.origin_rejected', { origin });
-        socket.write('HTTP/1.1 403 Forbidden\\r\\nConnection: close\\r\\n\\r\\n');
-        socket.destroy();
-        return;
-      }
-    } else if (!config.allowMissingOrigin) {
-      socket.write('HTTP/1.1 403 Forbidden\\r\\nConnection: close\\r\\n\\r\\n');
+    // Firefox/Tampermonkey content-script WebSockets may send the literal
+    // "null" origin instead of the page origin. origin is not authentication:
+    // the frame still needs a forum token / valid session + ACCESS_KEY.
+    const missingOrigin = !origin || origin === 'null';
+    if (!missingOrigin && !config.allowedOrigins.includes(origin)) {
+      logger.warn('ws.origin_rejected', { origin });
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+    if (missingOrigin && !config.allowMissingOrigin) {
+      logger.warn('ws.origin_rejected', { origin });
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
       socket.destroy();
       return;
     }

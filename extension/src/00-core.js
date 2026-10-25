@@ -892,12 +892,12 @@ async function findForumUser(token) {
       if (!csrf) return null;
       const body = new URLSearchParams();
       body.append('q', token);
-      body.append('_xfRequestUri', location.pathname + location.search);
+      body.append('_xfRequestUri', pagePath());
       body.append('_xfNoRedirect', '1');
       body.append('_xfToken', csrf);
       body.append('_xfResponseType', 'json');
       const origin = PAGE_WINDOW?.location?.origin || location.origin;
-      const response = await fetch(new URL('/members/find', origin).href, {
+      const response = await pageFetch(new URL('/members/find', origin).href, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -1045,6 +1045,23 @@ function pageOrigin() {
   return PAGE_WINDOW?.location?.origin || location.origin;
 }
 
+function pagePath() {
+  const pageLocation = PAGE_WINDOW?.location || location;
+  return `${pageLocation.pathname || ''}${pageLocation.search || ''}`;
+}
+
+function createPageWebSocket(url) {
+  const PageWebSocket = PAGE_WINDOW?.WebSocket;
+  if (typeof PageWebSocket === 'function' && PageWebSocket !== WebSocket) {
+    try {
+      return new PageWebSocket(url);
+    } catch {
+      // fall through to the sandbox WebSocket
+    }
+  }
+  return new WebSocket(url);
+}
+
 function pageFetch(input, init) {
   const fn = PAGE_WINDOW?.fetch;
   if (typeof fn === 'function' && fn !== fetch) {
@@ -1066,12 +1083,12 @@ async function getForumApiToken() {
     const body = new URLSearchParams();
     body.append('scope[]', 'basic');
     body.append('scope[]', 'post');
-    body.append('_xfRequestUri', location.pathname + location.search);
+    body.append('_xfRequestUri', pagePath());
     body.append('_xfNoRedirect', '1');
     body.append('_xfToken', csrf);
     body.append('_xfResponseType', 'json');
     try {
-      const response = await fetch(
+      const response = await pageFetch(
         `${pageOrigin()}/login/generate-temporary-token`,
         {
           method: 'POST',
@@ -1293,7 +1310,7 @@ async function fetchForumUnfurl(url, token) {
   if (!csrf || !token) return null;
   const body = new URLSearchParams();
   body.append('url', url);
-  body.append('_xfRequestUri', location.pathname + location.search);
+  body.append('_xfRequestUri', pagePath());
   body.append('_xfNoRedirect', '1');
   body.append('_xfToken', csrf);
   body.append('_xfResponseType', 'json');
