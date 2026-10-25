@@ -77,19 +77,27 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
     }
   }
 
-  function onlineCount() {
-    let count = 0;
+  function onlineUsers() {
+    const users = new Map();
     for (const client of wss.clients) {
-      if (client.readyState === WebSocket.OPEN && client.authenticated) count += 1;
+      if (client.readyState !== WebSocket.OPEN || !client.authenticated || !client.user) continue;
+      if (!users.has(client.user.id)) users.set(client.user.id, client.user);
     }
-    return count;
+    return [...users.values()].sort((a, b) =>
+      String(a.username || '').localeCompare(String(b.username || ''), 'ru'),
+    );
+  }
+
+  function onlineCount() {
+    return onlineUsers().length;
   }
 
   function broadcastPresence() {
-    const online = onlineCount();
-    if (lastPresence === online) return;
-    lastPresence = online;
-    broadcast({ type: ServerType.PRESENCE, online, serverTime: Date.now() });
+    const users = onlineUsers();
+    const signature = users.map((user) => user.id).join(',');
+    if (lastPresence === signature) return;
+    lastPresence = signature;
+    broadcast({ type: ServerType.PRESENCE, online: users.length, users, serverTime: Date.now() });
   }
 
   function schedulePresence() {
@@ -102,7 +110,13 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
   }
 
   function sendPresence(ws) {
-    send(ws, { type: ServerType.PRESENCE, online: onlineCount(), serverTime: Date.now() });
+    const users = onlineUsers();
+    send(ws, {
+      type: ServerType.PRESENCE,
+      online: users.length,
+      users,
+      serverTime: Date.now(),
+    });
   }
 
   async function handleAuth(ws, data) {
@@ -148,7 +162,8 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
         user: result.user,
         session: result.sessionToken,
         expiresAt: result.expiresAt,
-        online: onlineCount(),
+        online: onlineUsers().length,
+        users: onlineUsers(),
         serverTime: Date.now(),
       });
       sendPresence(ws);
