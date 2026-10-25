@@ -1905,16 +1905,19 @@ function openMessageMenu(message, x, y) {
   positionMenu(menu, x, y);
   state.menuEl = menu;
 
-  const close = (event) => {
-    if (event?.type === 'pointerdown' && menu.contains(event.target)) return;
-    closeMenu();
-  };
   setTimeout(() => {
-    document.addEventListener('pointerdown', close, true);
+    document.addEventListener('pointerdown', closeMenuFromOutside, true);
     document.addEventListener('keydown', onMenuKeydown, true);
     window.addEventListener('resize', closeMenu, { passive: true });
     window.addEventListener('scroll', closeMenu, true);
   }, 0);
+}
+
+function closeMenuFromOutside(event) {
+  const menu = state.menuEl;
+  if (!menu) return;
+  if (event?.type === 'pointerdown' && menu.contains(event.target)) return;
+  closeMenu();
 }
 
 function onMenuKeydown(event) {
@@ -1938,10 +1941,13 @@ function positionMenu(menu, x, y) {
 }
 
 function closeMenu() {
-  if (state.menuEl) {
-    state.menuEl.remove();
-    state.menuEl = null;
-  }
+  const menu = state.menuEl;
+  state.menuEl = null;
+  if (menu) menu.remove();
+  document.removeEventListener('pointerdown', closeMenuFromOutside, true);
+  document.removeEventListener('keydown', onMenuKeydown, true);
+  window.removeEventListener('resize', closeMenu);
+  window.removeEventListener('scroll', closeMenu, true);
 }
 
 function showSystemMessage(text) {
