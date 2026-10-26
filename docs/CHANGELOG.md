@@ -4,7 +4,7 @@
 
 - Socket modal now closes on Escape even when focus escapes the dialog; close
   animation and backdrop behaviour are unchanged.
-- Server and extension: `1.1.24`.
+- Сервер и extension: `1.1.24`.
 
 ## 1.1.23
 
@@ -13,7 +13,7 @@
   content: rendered as a muted unavailable block.
 - Removed trailing whitespace left by the block parser, so BBCode lists and
   quotes do not add an empty line under a message.
-- Server and extension: `1.1.23`.
+- Сервер и extension: `1.1.23`.
 
 ## 1.1.22
 
