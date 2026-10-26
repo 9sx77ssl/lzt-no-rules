@@ -1519,17 +1519,13 @@ function bbcodeImageElement(url) {
 
 function bbcodeUserElement(inner, id) {
   const name = String(inner || '').replace(/^@/, '').trim() || 'unknown';
-  const anchor = document.createElement('a');
-  anchor.className = 'notranslate username mention';
-  anchor.setAttribute('contenteditable', 'false');
-  anchor.setAttribute('translate', 'no');
-  anchor.dataset.user = `${Number(id) || 0}, ${name}`;
-  if (Number(id) > 0) anchor.href = `/members/${Number(id)}/`;
-  const nick = document.createElement('span');
-  nick.className = 'styleUserNickname';
-  nick.textContent = name;
-  anchor.appendChild(nick);
-  return anchor;
+  const userId = Number(id) || 0;
+  return createMentionNode({
+    id: userId,
+    username: name,
+    usernameHtml: `<span class="styleUserNickname">${escapeHtml(name)}</span>`,
+    avatar: null,
+  });
 }
 
 function bbcodeColorValue(value) {
@@ -1644,7 +1640,7 @@ function bbcodeMediaUrl(value, inner) {
   return '';
 }
 
-const BBCODE_RENDER_TAGS = new Set(['img', 'media', 'unfurl', 'url', 'video']);
+const BBCODE_RENDER_TAGS = new Set(['img', 'media', 'unfurl', 'url', 'user', 'video']);
 
 function bbcodeElement(tag, value, inner) {
   const name = String(tag || '').toLowerCase();

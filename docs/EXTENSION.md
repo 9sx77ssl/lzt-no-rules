@@ -11,7 +11,7 @@ cd server
 bun install
 cd ..
 
-NR_VERSION=1.1.26 \
+NR_VERSION=1.1.27 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -264,8 +264,8 @@ document-start
 `resolveBbcode`:
 
 - парсит plain-text блоки Tiptap целиком, включая переносы `<br>`;
-- оставляет рабочими только `[URL]`, `[IMG]`, `[MEDIA]`, `[VIDEO]` и
-  `[UNFURL]`;
+- оставляет рабочими только `[URL]`, `[IMG]`, `[MEDIA]`, `[VIDEO]`,
+  `[USER]` и `[UNFURL]`;
 - остальные теги не трогает: они остаются текстом как набраны, включая
   permission-only теги;
 - вызывается при отправке и при рендере старых сообщений.

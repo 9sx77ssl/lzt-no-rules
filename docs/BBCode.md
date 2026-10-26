@@ -10,6 +10,7 @@
 | `[MEDIA=youtube]...[/MEDIA]` | media-карточка |
 | `[VIDEO]https://...[/VIDEO]` | HTML5 video |
 | `[UNFURL="..."]...[/UNFURL]` | market/forum карточка |
+| `[USER=id]@ник[/USER]` | нативный mention с аватаром |
 
 Всё остальное (`B`, `I`, `U`, `S`, `COLOR`, `SIZE`, `CENTER`, `LEFT`,
 `RIGHT`, `QUOTE`, `LIST`, `EMAIL`, `SPOILER`, `CODE`, `PHP`, `HTML`, `SRC`,
