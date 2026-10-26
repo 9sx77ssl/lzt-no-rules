@@ -107,6 +107,16 @@ const NR_CSS = `
   font-size: 12px;
 }
 #no-rules-messages .bbCodeImage { max-width: 100%; }
+/* Smileys pasted/inserted as image nodes must match the native 32x32 editor
+   preview, regardless of SVG/WebP intrinsic dimensions or Tiptap inline styles. */
+.chat2-footer .tiptap img.smilie-image-tiptap,
+.chat2-footer .tiptap img.image[alt^=":"][alt$=":"] {
+  width: 32px !important;
+  height: 32px !important;
+  max-width: 32px !important;
+  max-height: 32px !important;
+  object-fit: contain;
+}
 #no-rules-messages .message-highlight {
   animation: nr-message-highlight-animation 5s .3s;
   /* Only extend the tint horizontally. A shorthand margin would wipe the

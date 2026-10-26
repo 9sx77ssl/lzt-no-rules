@@ -519,7 +519,9 @@ function startEdit(message) {
   state.editing = message;
   setEditorHtml(message.html || '');
   renderEditBar();
-  getEditorElement()?.focus();
+  const editor = getTiptap();
+  if (editor) editor.commands.focus('end');
+  else getEditorElement()?.focus();
   document.querySelector('.chat2-footer')?.scrollIntoView({ block: 'end' });
 }
 

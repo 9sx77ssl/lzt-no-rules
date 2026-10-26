@@ -135,6 +135,7 @@ const state = {
   lastEditorLength: 0,
   limitRestoring: false,
   limitEditor: null,
+  clearEditorToken: 0,
   authError: '',
   authFailedPermanently: false,
   templates: null,
@@ -1017,14 +1018,44 @@ function editorIsEmpty() {
   return true;
 }
 
+function clearTiptapContent(editor) {
+  if (typeof editor.commands.clearContent === 'function') {
+    editor.commands.clearContent(true);
+  } else {
+    editor.commands.setContent('');
+  }
+}
+
 function clearEditor() {
+  const token = ++state.clearEditorToken;
   const wasRestoring = state.limitRestoring;
   state.limitRestoring = true;
   try {
     const editor = getTiptap();
     if (editor) {
-      editor.commands.setContent('');
-      editor.commands.focus();
+      clearTiptapContent(editor);
+      editor.commands.focus('end');
+      // Tiptap NodeViews can occasionally commit a late transaction after a
+      // multi-image clear. Clear once more on the next frame only if the user
+      // has not started a new draft in the meantime.
+      requestAnimationFrame(() => {
+        if (token !== state.clearEditorToken || !state.active) return;
+        const current = getTiptap();
+        const element = getEditorElement();
+        if (!current || !element) return;
+        const hasContent = Boolean(current.getText().trim()) ||
+          Boolean(element.querySelector('img, video, .tiptap-media, .node-image, .node-smilie'));
+        if (!hasContent) return;
+        const restoreGuard = state.limitRestoring;
+        state.limitRestoring = true;
+        try {
+          clearTiptapContent(current);
+          current.commands.focus('end');
+        } finally {
+          state.limitRestoring = restoreGuard;
+          syncEditorLimitState();
+        }
+      });
       return;
     }
     const element = getEditorElement();
@@ -1038,13 +1069,14 @@ function clearEditor() {
 }
 
 function setEditorHtml(html) {
+  ++state.clearEditorToken;
   const wasRestoring = state.limitRestoring;
   state.limitRestoring = true;
   try {
     const editor = getTiptap();
     if (editor) {
       editor.commands.setContent(html || '');
-      editor.commands.focus();
+      editor.commands.focus('end');
       muteEditorVideos();
       return;
     }

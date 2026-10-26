@@ -351,6 +351,7 @@ function onDocumentKeydownCapture(event) {
 function onEditorInputCapture(event) {
   const target = event.target instanceof Element ? event.target : null;
   if (!state.active || !target?.closest('.chat2-footer .tiptap')) return;
+  if (event.isTrusted) ++state.clearEditorToken;
   if (event.isTrusted && !enforceEditorLimit()) {
     state.draft = getEditorHtml();
     return;
