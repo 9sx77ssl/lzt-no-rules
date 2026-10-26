@@ -112,6 +112,8 @@ const state = {
   roomScrollTop: 0,
   roomAtBottom: true,
   roomSuspended: false,
+  socketProbe: null,
+  socketDebugTimer: null,
   lastTypingAt: 0,
   connectionError: '',
   authError: '',
@@ -1845,11 +1847,43 @@ function parseBbcodeFragment(text) {
   return fragment;
 }
 
+const BBCODE_BLOCK_TAG_RE = /\[(?:LIST|QUOTE|SPOILER|CODE|PHP|HTML|SRC|CENTER|LEFT|RIGHT|TABLE)(?:=[^\]]*)?\]/i;
+
+function canFlattenBbcode(content) {
+  for (const element of content.querySelectorAll('*')) {
+    const tag = element.tagName;
+    if (tag === 'BR' || tag === 'P' || tag === 'DIV') continue;
+    if (tag === 'SPAN' && !element.className) continue;
+    return false;
+  }
+  return true;
+}
+
+function bbcodePlainText(content) {
+  const holder = document.createElement('div');
+  holder.appendChild(content.cloneNode(true));
+  for (const br of [...holder.querySelectorAll('br')]) br.replaceWith('\n');
+  for (const block of [...holder.querySelectorAll('p, div, li')]) block.append('\n');
+  return String(holder.textContent || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
 function resolveBbcode(html) {
   const source = String(html || '');
   if (!/\[[a-z]+(?:=[^\]]*)?\]/i.test(source)) return source;
   const template = document.createElement('template');
   template.innerHTML = source;
+
+  // A plain-text message can be split by Tiptap into several <p>/<br> nodes.
+  // For block BBCode it must be parsed as one string; otherwise [QUOTE] and
+  // [LIST] would see only one line at a time.
+  if (BBCODE_BLOCK_TAG_RE.test(source) && canFlattenBbcode(template.content)) {
+    const parsed = parseBbcodeFragment(bbcodePlainText(template.content));
+    template.content.replaceChildren(parsed);
+    return template.innerHTML;
+  }
 
   // Tiptap turns newlines into <br>; parse plain text blocks as one string so
   // [LIST], [QUOTE] and [SPOILER] can span several visual lines.

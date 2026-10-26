@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.22
+
+- Socket debug modal: native backdrop, fade/slide animation, body scroll lock,
+  close by X/outside/Escape, extra test WebSocket connection.
+- BBCode blocks now parse across Tiptap paragraphs/`<br>`; `SIZE`, `CENTER`,
+  `QUOTE`, `LIST`, `EMAIL`, `SPOILER`, `PRICE` and `BUTTON` work after send/F5.
+- Quote class survives server sanitizer; spoiler/list/quote markup is kept in
+  both client and server allowlists.
+- Server and extension: `1.1.22`.
+
 ## 1.1.21
 
 - Tiptap-хвосты (`ProseMirror-widget`, лишние `<br>` и пустые `<p>`) больше

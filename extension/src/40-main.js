@@ -454,6 +454,7 @@ function exposeDebugApi() {
     sanitizeHtml: (html) => sanitizeClientHtml(String(html || '')),
     enhanceHtml: (html) => enhanceUnfurls(String(html || '')),
     bbcodeHtml: (html) => resolveBbcode(String(html || '')),
+    bbcodePlain: (html) => { const t = document.createElement('template'); t.innerHTML = String(html || ''); return bbcodePlainText(t.content); },
     simulateTyping: (username = 'test') => {
       if (!state.active) activateRoom();
       markTyping({ id: 999999999, username: String(username || 'test').slice(0, 32) });

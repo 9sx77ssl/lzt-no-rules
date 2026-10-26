@@ -531,6 +531,7 @@ export function createSanitizer(options = {}) {
       'data-price-currency',
     ],
     p: ['class'],
+    blockquote: ['class'],
     div: ['class', 'style', 'data-href', 'data-author'],
     button: ['type', 'class', 'title', 'data-target'],
     code: ['class', 'data-lang'],

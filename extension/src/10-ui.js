@@ -302,6 +302,68 @@ const NR_CSS = `
   cursor: pointer;
 }
 
+.nr-socket-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10006;
+  background: rgba(0, 0, 0, .77);
+  opacity: 0;
+  transition: opacity .15s;
+}
+.nr-socket-backdrop.in { opacity: 1; }
+.no-rules-socket-modal {
+  display: flex !important;
+  position: fixed;
+  inset: 0;
+  z-index: 10007;
+  padding: 0 16px;
+  overflow: auto;
+  background: transparent;
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition: transform .2s ease-out, opacity .15s;
+}
+.no-rules-socket-modal.in {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.no-rules-socket-modal .xenOverlay {
+  position: relative;
+  top: 10% !important;
+  width: min(638px, calc(100vw - 32px));
+  margin: 0 auto;
+}
+.no-rules-socket-modal .sectionMain {
+  background: var(--contentBackground, #111615);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.no-rules-socket-modal .helper {
+  padding: 0;
+}
+.no-rules-socket-modal .socket-info {
+  padding: 16px 20px;
+  line-height: 1.5;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+.no-rules-socket-modal .socket-info:last-child {
+  border-bottom: 0;
+}
+.no-rules-socket-modal .loadingIcon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-left: 8px;
+  vertical-align: -2px;
+  border: 2px solid rgba(255, 255, 255, .2);
+  border-top-color: var(--primaryMedium, #2f8a5d);
+  border-radius: 50%;
+  animation: nr-socket-spin .8s linear infinite;
+}
+@keyframes nr-socket-spin { to { transform: rotate(360deg); } }
+body.nr-socket-modal-open { overflow: hidden; }
 .nr-room-unread {
   display: inline-flex;
   align-items: center;
@@ -716,15 +778,78 @@ function onSocketDebugKeydown(event) {
   closeSocketDebug();
 }
 
-function closeSocketDebug() {
-  document.querySelector('.no-rules-socket-modal')?.remove();
+function setSocketInfoRow(row, value, { loading = false } = {}) {
+  if (!row) return;
+  const label = row.querySelector('b')?.textContent || '';
+  row.replaceWith(createSocketInfoRow(label, value, { loading }));
+}
+
+function closeSocketDebug(immediate = false) {
+  const modal = document.querySelector('.no-rules-socket-modal');
+  const backdrop = document.querySelector('.nr-socket-backdrop');
+  if (state.socketDebugTimer) {
+    clearTimeout(state.socketDebugTimer);
+    state.socketDebugTimer = null;
+  }
+  if (state.socketProbe) {
+    try { state.socketProbe.close(1000, 'debug_close'); } catch { /* ignore */ }
+    state.socketProbe = null;
+  }
   document.removeEventListener('keydown', onSocketDebugKeydown, true);
+  document.body.classList.remove('nr-socket-modal-open');
+  if (!modal) {
+    backdrop?.remove();
+    return;
+  }
+  modal.classList.remove('in');
+  backdrop?.classList.remove('in');
+  const remove = () => {
+    if (modal === document.querySelector('.no-rules-socket-modal')) modal.remove();
+    if (backdrop === document.querySelector('.nr-socket-backdrop')) backdrop.remove();
+    state.socketDebugTimer = null;
+  };
+  if (immediate) remove();
+  else state.socketDebugTimer = setTimeout(remove, 220);
+}
+
+function probeSocketConnection(row) {
+  if (!row) return;
+  if (state.socketProbe) {
+    try { state.socketProbe.close(1000, 'debug_reconnect'); } catch { /* ignore */ }
+    state.socketProbe = null;
+  }
+  let settled = false;
+  let probe;
+  try {
+    probe = createPageWebSocket(BUILD.wsUrl);
+  } catch {
+    setSocketInfoRow(row, 'Не удалось создать WebSocket');
+    return;
+  }
+  state.socketProbe = probe;
+  const finish = (text) => {
+    if (settled) return;
+    settled = true;
+    setSocketInfoRow(row, text);
+    if (state.socketProbe === probe) state.socketProbe = null;
+    try { probe.close(1000, 'debug_done'); } catch { /* ignore */ }
+  };
+  probe.onopen = () => finish('Сокет работает');
+  probe.onerror = () => finish('Ошибка соединения');
+  probe.onclose = () => {
+    if (!settled) finish('Сокет закрыт');
+  };
+  setTimeout(() => finish('Таймаут соединения'), 5_000);
 }
 
 function openSocketDebug() {
-  closeSocketDebug();
+  closeSocketDebug(true);
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop fade nr-socket-backdrop';
+  backdrop.style.zIndex = '10006';
+
   const modal = document.createElement('div');
-  modal.className = 'modal fade in no-rules-socket-modal';
+  modal.className = 'modal fade no-rules-socket-modal';
   modal.dataset.zIndex = '10007';
   modal.style.zIndex = '10007';
   modal.tabIndex = -1;
@@ -748,6 +873,7 @@ function openSocketDebug() {
 
   const socketOpen = state.ws?.readyState === 1;
   const pongAgo = state.lastPongAt ? Math.max(0, Math.round((now() - state.lastPongAt) / 1000)) : null;
+  const probeRow = createSocketInfoRow('Проверка соединения:', 'Проверка…', { loading: true });
   helper.append(
     createSocketInfoRow(
       'Проверка WebSocket:',
@@ -759,6 +885,7 @@ function openSocketDebug() {
       state.wsAuthenticated ? 'Авторизован' : state.connectionError || 'Нет авторизации',
       { loading: state.wsState === 'connecting' && !state.wsAuthenticated },
     ),
+    probeRow,
     createSocketInfoRow(
       'Проверка истории:',
       state.historyLoading
@@ -776,7 +903,12 @@ function openSocketDebug() {
   overlay.append(closer, section);
   section.append(title, helper);
   modal.appendChild(overlay);
-  document.body.appendChild(modal);
+  document.body.append(backdrop, modal);
+  document.body.classList.add('nr-socket-modal-open');
+  requestAnimationFrame(() => {
+    backdrop.classList.add('in');
+    modal.classList.add('in');
+  });
 
   const close = (event) => {
     event?.preventDefault?.();
@@ -784,6 +916,7 @@ function openSocketDebug() {
     closeSocketDebug();
   };
   closer.addEventListener('click', close);
+  backdrop.addEventListener('click', close);
   modal.addEventListener('click', (event) => {
     if (event.target === modal) close(event);
   });
@@ -792,8 +925,8 @@ function openSocketDebug() {
   });
   document.addEventListener('keydown', onSocketDebugKeydown, true);
   modal.focus();
+  probeSocketConnection(probeRow);
 }
-
 function ensureSocketIndicator() {
   if (!state.active) return;
   const roomTitle = getChatRoot()?.querySelector('.room-title');
