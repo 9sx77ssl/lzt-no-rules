@@ -8,7 +8,7 @@ Tiptap, reply/edit-бары, контекстное меню и мобильны
 - Репозиторий: <https://github.com/9sx77ssl/lzt-no-rules>
 - WSS: `wss://lztws.d9v.uk/ws`
 - Health: <https://lztws.d9v.uk/health> · Version: <https://lztws.d9v.uk/version>
-- Версия: **1.2.1**
+- Версия: **1.2.2**
 
 > Это не E2E. Сообщения хранятся в SQLite у владельца сервера. Пароль,
 > cookies форума и платёжные данные на backend не отправляются.
@@ -105,7 +105,7 @@ bun run start
 ## Сборка и релиз
 
 ```bash
-NR_VERSION=1.2.1 \
+NR_VERSION=1.2.2 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -121,7 +121,7 @@ cd server && npm test
 
 ## BBCode и карточки
 
-В чате форматируются URL, IMG, MEDIA, VIDEO, UNFURL и USER. Остальные
+В чате форматируются URL, IMG (включая размеры `[IMG=width=...;height=...]`), MEDIA, VIDEO, UNFURL и USER. Остальные
 BBCode-теги не трогаются и остаются обычным текстом как есть, включая скобки. Tiptap-хвосты удаляются, поэтому карточки не растягивают
 сообщение. `market_search` приводится к legacy-карточке 24 px.
 

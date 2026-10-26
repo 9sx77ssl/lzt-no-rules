@@ -620,6 +620,11 @@ function failPending(clientId, message) {
     .find((element) => String(element.dataset.messageId) === String(pending.id));
   if (pending.html && editorIsEmpty()) {
     setEditorHtml(pending.html);
+    saveDraftStorage();
+  }
+  if (pending.reply && !state.replyTo) {
+    state.replyTo = pending.reply;
+    if (state.active) renderReplyBar();
   }
   state.pending.delete(clientId);
   state.outbox = state.outbox.filter((item) => item.clientId !== clientId);
