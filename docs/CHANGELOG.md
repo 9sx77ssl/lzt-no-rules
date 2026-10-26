@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.23
+
+- Permission-only BBCode (`CLUB`, `DAYS`, `LIKES`, `LIKES2`, `USERIDS`, `API`,
+  `TOOLTIP`, `VISITOR`, `LANG`, `EXCEPTIDS`) no longer leaks raw tags or hidden
+  content: rendered as a muted unavailable block.
+- Removed trailing whitespace left by the block parser, so BBCode lists and
+  quotes do not add an empty line under a message.
+- Server and extension: `1.1.23`.
+
 ## 1.1.22
 
 - Socket debug modal: native backdrop, fade/slide animation, body scroll lock,

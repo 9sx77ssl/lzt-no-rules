@@ -1644,7 +1644,26 @@ function bbcodeMediaUrl(value, inner) {
   return '';
 }
 
+const BBCODE_RESTRICTED = new Set([
+  'api',
+  'club',
+  'days',
+  'exceptids',
+  'lang',
+  'likes',
+  'likes2',
+  'tooltip',
+  'userids',
+  'visitor',
+]);
+
 function bbcodeElement(tag, value, inner) {
+  if (BBCODE_RESTRICTED.has(tag)) {
+    const el = document.createElement('span');
+    el.className = 'muted';
+    el.textContent = 'Скрытый контент форума недоступен';
+    return el;
+  }
   switch (tag) {
     case 'b':
     case 'strong': {
@@ -1882,7 +1901,7 @@ function resolveBbcode(html) {
   if (BBCODE_BLOCK_TAG_RE.test(source) && canFlattenBbcode(template.content)) {
     const parsed = parseBbcodeFragment(bbcodePlainText(template.content));
     template.content.replaceChildren(parsed);
-    return template.innerHTML;
+    return normalizeClientHtml(template.innerHTML);
   }
 
   // Tiptap turns newlines into <br>; parse plain text blocks as one string so
@@ -1913,7 +1932,7 @@ function resolveBbcode(html) {
   for (const node of nodes) {
     node.parentNode?.replaceChild(parseBbcodeFragment(node.nodeValue || ''), node);
   }
-  return template.innerHTML;
+  return normalizeClientHtml(template.innerHTML);
 }
 
 async function resolvePlainUnfurls(html) {
