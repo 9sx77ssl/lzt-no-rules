@@ -1094,7 +1094,9 @@ function createMentionNode(user) {
 async function resolvePlainMentions(html) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '');
-  if (!template.innerHTML.includes('@')) return template.innerHTML;
+  if (!template.innerHTML.includes('@') && !template.content.querySelector('a.mention')) {
+    return template.innerHTML;
+  }
   const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) {
@@ -1107,7 +1109,8 @@ async function resolvePlainMentions(html) {
       continue;
     if (node.nodeValue?.includes('@')) nodes.push(node);
   }
-  if (!nodes.length) return template.innerHTML;
+  const mentionNodes = [...template.content.querySelectorAll('a.mention[data-user]')];
+  if (!nodes.length && !mentionNodes.length) return template.innerHTML;
 
   const tokens = new Set();
   for (const node of nodes) {
@@ -1148,6 +1151,20 @@ async function resolvePlainMentions(html) {
     }
     node.parentNode?.replaceChild(fragment, node);
   }
+
+  // [USER=id] already has a basic mention; fill in the real avatar/name style
+  // from the forum when the nickname resolves. Failures keep the basic block.
+  await Promise.all(
+    mentionNodes.map(async (anchor) => {
+      const [rawId, ...nameParts] = String(anchor.dataset.user || '').split(',');
+      const id = Number(rawId) || 0;
+      const name = nameParts.join(',').trim();
+      if (!id || !name) return;
+      const user = await findForumUser(name);
+      if (!user) return;
+      anchor.replaceWith(createMentionNode({ ...user, id }));
+    }),
+  );
   return template.innerHTML;
 }
 
