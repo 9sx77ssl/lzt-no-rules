@@ -127,8 +127,7 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
     presenceTimer.unref?.();
   }
 
-  function sendPresence(ws) {
-    const users = onlineUsers();
+  function sendPresence(ws, users = onlineUsers()) {
     send(ws, {
       type: ServerType.PRESENCE,
       online: users.length,
@@ -185,7 +184,7 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
         users,
         serverTime: Date.now(),
       });
-      sendPresence(ws);
+      sendPresence(ws, users);
       schedulePresence();
 
       logger.info('ws.authenticated', {
@@ -218,7 +217,10 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
   }
 
   function currentDbUser(ws) {
-    return db.getUser(ws.user.id) || ws.user;
+    // ws.user came from the verified/session-backed auth response. Avoid a
+    // synchronous DB read on every send; the latest profile can be refreshed
+    // on the next auth/resume.
+    return ws.user;
   }
 
   function assertCanModify(ws, message) {

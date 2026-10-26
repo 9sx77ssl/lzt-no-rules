@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.7
+
+- Socket hot path: auth presence list считается один раз, отправка сообщения
+  больше не делает лишний `SELECT` пользователя на каждый кадр.
+- Сервер и extension: `1.2.7`.
+
 ## 1.2.6
 
 - Security hardening: временный JWT без `read`/`chatbox` scope и токены с
