@@ -467,6 +467,16 @@ body.nr-online-modal-open { overflow: hidden; }
   border-radius: 8px;
   overflow: hidden;
 }
+/* The forum theme can inject a 12px top radius into modal headings; it clips
+   badly inside 638px overlays. Keep No Rules modals square. */
+.no-rules-online-modal .xenOverlay .sectionMain,
+.no-rules-online-modal .xenOverlay .section .heading,
+.no-rules-online-modal .xenOverlay .sectionMain .heading,
+.no-rules-socket-modal .xenOverlay .sectionMain,
+.no-rules-socket-modal .xenOverlay .section .heading,
+.no-rules-socket-modal .xenOverlay .sectionMain .heading {
+  border-radius: 0 !important;
+}
 .no-rules-socket-modal .helper {
   padding: 0;
 }

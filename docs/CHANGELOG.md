@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.9
+
+- Онлайн-модалка и модалка сокета: убран `border-radius` у heading и
+  `.sectionMain`, чтобы нативный 12px top-radius темы не ломал углы.
+- Сервер и extension: `1.3.9`.
+
 ## 1.3.8
 
 - Firefox/Tampermonkey: добавлен `@sandbox raw`; editor-команды доступны
