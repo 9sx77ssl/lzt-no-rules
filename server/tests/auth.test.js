@@ -64,17 +64,17 @@ function makeApp(fetchImpl) {
 function userResponse() {
   return {
     user: {
-      user_id: 9252369,
-      username: 'yolo',
+      user_id: 424242,
+      username: 'test_user',
       rendered: {
-        username: '<span style="color: #949494;" class="styleUserNickname">yolo</span>',
+        username: '<span style="color: #949494;" class="styleUserNickname">test_user</span>',
         avatars: {
-          s: 'https://nztcdn.com/avatar/s/1792359851/9252369.webp',
+          s: 'https://nztcdn.com/avatar/s/1792359851/424242.webp',
         },
       },
       is_banned: false,
-      short_link: 'yolo',
-      view_url: 'https://lolz.team/yolo/',
+      short_link: 'test_user',
+      view_url: 'https://lolz.team/test_user/',
     },
   };
 }
@@ -87,9 +87,9 @@ test('decodes JWT payload', () => {
 
 test('normalizes public forum user fields', () => {
   const user = normalizeForumUser(userResponse().user);
-  assert.equal(user.id, 9252369);
-  assert.equal(user.avatar, 'https://nztcdn.com/avatar/s/1792359851/9252369.webp');
-  assert.equal(user.profileUrl, 'https://lolz.team/yolo/');
+  assert.equal(user.id, 424242);
+  assert.equal(user.avatar, 'https://nztcdn.com/avatar/s/1792359851/424242.webp');
+  assert.equal(user.profileUrl, 'https://lolz.team/test_user/');
   assert.equal(user.isBanned, false);
 });
 
@@ -97,7 +97,7 @@ test('verifies a temporary token through the forum API and caches it', async () 
   let calls = 0;
   const app = makeApp(async (url, options) => {
     calls += 1;
-    assert.match(String(url), /\/users\/9252369$/);
+    assert.match(String(url), /\/users\/424242$/);
     assert.match(options.headers.Authorization, /^Bearer header\./);
     return {
       ok: true,
@@ -111,18 +111,18 @@ test('verifies a temporary token through the forum API and caches it', async () 
   try {
     const now = Math.floor(Date.now() / 1000);
     const token = makeToken({
-      sub: 9252369,
+      sub: 424242,
       iss: 'lzt',
       exp: now + 3600,
       iat: now,
       scope: 'chatbox read',
     });
     const user = await app.auth.verifyTemporaryToken(token, { ip: '127.0.0.1' });
-    assert.equal(user.id, 9252369);
-    assert.equal(user.username, 'yolo');
+    assert.equal(user.id, 424242);
+    assert.equal(user.username, 'test_user');
     assert.equal(user.color, '#949494');
     const cached = await app.auth.verifyTemporaryToken(token, { ip: '127.0.0.1' });
-    assert.equal(cached.id, 9252369);
+    assert.equal(cached.id, 424242);
     assert.equal(calls, 1);
     assert.equal(app.auth.verifyAccessKey(baseConfig.accessKey), true);
     assert.equal(app.auth.verifyAccessKey('wrong-key-1234567890'), false);
@@ -143,7 +143,7 @@ test('creates and resumes an opaque session without the forum token', async () =
   try {
     const now = Math.floor(Date.now() / 1000);
     const temporaryToken = makeToken({
-      sub: 9252369,
+      sub: 424242,
       iss: 'lzt',
       exp: now + 3600,
       iat: now,
@@ -156,14 +156,14 @@ test('creates and resumes an opaque session without the forum token', async () =
     });
     assert.ok(first.sessionToken);
     assert.equal(first.resumed, false);
-    assert.equal(app.db.getUser(9252369)?.username, 'yolo');
+    assert.equal(app.db.getUser(424242)?.username, 'test_user');
 
     const second = await app.auth.authenticate({
       sessionToken: first.sessionToken,
       accessKey: baseConfig.accessKey,
       ip: '127.0.0.1',
     });
-    assert.equal(second.user.id, 9252369);
+    assert.equal(second.user.id, 424242);
     assert.equal(second.resumed, true);
     assert.equal(second.tokenHash, sha256(first.sessionToken));
   } finally {
@@ -178,7 +178,7 @@ test('rejects a post-scoped temporary token', async () => {
   try {
     const now = Math.floor(Date.now() / 1000);
     const token = makeToken({
-      sub: 9252369,
+      sub: 424242,
       iss: 'lzt',
       exp: now + 3600,
       iat: now,
@@ -216,7 +216,7 @@ test('rejects a temporary token without read/chatbox scope', async () => {
   });
   try {
     const now = Math.floor(Date.now() / 1000);
-    const token = makeToken({ sub: 9252369, iss: 'lzt', exp: now + 3600, iat: now });
+    const token = makeToken({ sub: 424242, iss: 'lzt', exp: now + 3600, iat: now });
     await assert.rejects(
       app.auth.verifyTemporaryToken(token, { ip: '127.0.0.1' }),
       (error) => error instanceof AuthError && error.code === 'invalid_token',

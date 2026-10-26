@@ -29,11 +29,11 @@ test('rejects empty messages', () => {
 
 test('keeps native mentions and avatar images from nztcdn', () => {
   const html =
-    '<p>hi <a href="https://lolz.team/members/2524284/" class="notranslate username mention" contenteditable="false" translate="no" data-user="2524284, doppler"><img alt="avatar" loading="lazy" class="avatar" src="https://nztcdn.com/avatar/s/1/2524284.webp"><span style="color:#ff0076" class="styleUserNickname">doppler</span></a></p>';
+    '<p>hi <a href="https://lolz.team/members/434343/" class="notranslate username mention" contenteditable="false" translate="no" data-user="434343, mention_user"><img alt="avatar" loading="lazy" class="avatar" src="https://nztcdn.com/avatar/s/1/434343.webp"><span style="color:#ff0076" class="styleUserNickname">mention_user</span></a></p>';
   const result = sanitizer.sanitizeMessage(html);
   assert.equal(result.meta.mentions, 1);
   assert.match(result.html, /class="notranslate username mention"/);
-  assert.match(result.html, /data-user="2524284, doppler"/);
+  assert.match(result.html, /data-user="434343, mention_user"/);
   assert.match(result.html, /style="color:#ff0076"/);
 });
 
@@ -68,10 +68,10 @@ test('enforces image limits', () => {
 
 test('keeps safe username svg icons and strips scripts', () => {
   const meta = extractUsernameMeta(
-    '<span style="color: #949494;" class="styleUserNickname">yolo</span><span class="uniqUsernameIcon--custom"><svg viewBox="0 0 24 24" onload="alert(1)"><path d="M5 12h14" fill="#fff" onclick="alert(2)"></path><script>alert(1)</script><foreignObject></foreignObject></svg></span>',
+    '<span style="color: #949494;" class="styleUserNickname">test_user</span><span class="uniqUsernameIcon--custom"><svg viewBox="0 0 24 24" onload="alert(1)"><path d="M5 12h14" fill="#fff" onclick="alert(2)"></path><script>alert(1)</script><foreignObject></foreignObject></svg></span>',
     'fallback',
   );
-  assert.equal(meta.username, 'yolo');
+  assert.equal(meta.username, 'test_user');
   assert.equal(meta.color, '#949494');
   assert.match(meta.usernameHtml, /style="color:#949494"/);
   assert.match(meta.usernameHtml, /uniqUsernameIcon--custom/);

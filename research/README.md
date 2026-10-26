@@ -21,7 +21,7 @@
 | `StatusInput-*.js` | status/input |
 | `script*.js` | XenForo legacy, lightbox/fancybox |
 
-Подробный разбор — [../docs/NATIVE-CHATBOX.md](../docs/NATIVE-CHATBOX.md).
+Подробный разбор — [../docs/PROJECT.md](../docs/PROJECT.md#13-research-нативные-чанки).
 
 Не используйте эти файлы как источник готового кода: версии чанков меняются
 вместе с форумом, имена/hash-классы (`lztng-*`) не являются стабильным API.

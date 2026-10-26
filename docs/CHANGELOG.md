@@ -8,6 +8,9 @@
 - Онлайн-модалка и модалка сокета используют один typed-хелпер
   `mountNativeModal`: backdrop, блокировка body, in/out, X, клик вне,
   Escape, фокус и очистка probes/таймеров.
+- Документация сжата до `README.md` + `docs/PROJECT.md` +
+  `docs/OPERATIONS.md`; `CHANGELOG.md` оставлен архивом. Тестовые фикстуры
+  обезличены, production IP/реальные ID не хранятся в репозитории.
 - Сервер и extension: `1.2.9`.
 
 ## 1.2.8

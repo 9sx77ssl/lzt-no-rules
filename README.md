@@ -20,12 +20,18 @@ Tiptap, reply/edit-бары, контекстное меню и мобильны
   одинаковые сообщения подряд.
 - Нативные карточки: market-разделы 24 px, форумные/медиа/аккаунты, фото
   через fancybox, XenForo-плеер, смайлы 96×96.
-- BBCode: URL, IMG (включая `[IMG=width=...;height=...]`), MEDIA, VIDEO, UNFURL и USER. Все остальные теги остаются обычным текстом как есть, вместе со скобками.
-- Pending-сообщения и ошибки отправки ведут себя как в нативном Chatbox; переход к reply грузит компактное окно истории.
+- BBCode: URL, IMG (включая `[IMG=width=...;height=...]`), MEDIA, VIDEO,
+  UNFURL и USER. Остальные теги остаются обычным текстом вместе со скобками.
+- Pending-сообщения и ошибки отправки как в нативном Chatbox; переход к reply
+  грузит компактное окно истории `history near`.
 - История, unread, typing, онлайн, мобильный вид и сохранение скролла при
   переключении комнат.
 - Outbox переживает обрыв и F5; `clientId` не даёт создать дубль; после
   `rate_limited` очередь повторяется сама.
+- Один typed-хелпер `mountNativeModal` для онлайн-списка и отладки сокета:
+  backdrop, блокировка body, плавное открытие/закрытие, X, клик вне, Escape.
+- Контекстное меню повторяет нативную `rise`-анимацию: 100 мс, fade +
+  `translateY(10px)`; сообщения входят нативной `fly`-анимацией.
 - Индикатор сокета рядом с названием комнаты; клик открывает отладочную
   модалку WebSocket/auth/history/outbox.
 
@@ -74,7 +80,7 @@ extension/dist/      собранный no-rules.user.js
 server/src/          Bun/Node backend, auth, sanitize, ws, db
 server/tests/        unit-тесты
 deploy/              systemd, nginx, update.sh
-docs/                архитектура, протокол, безопасность, тесты
+docs/                PROJECT.md, OPERATIONS.md, CHANGELOG.md
 research/            сохранённые JS-чанки Chatbox для реверса
 ```
 
@@ -111,56 +117,61 @@ NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
 
 node --check extension/dist/no-rules.user.js
-cd server && npm test
+cd server && npm test && npm run typecheck
 ```
 
 Публикация: `git push origin main`, затем
-`ssh new-server '/opt/no-rules/update.sh'`. Скрипт делает `git pull`,
+`ssh <production-host> '/opt/no-rules/update.sh'`. Скрипт делает `git pull`,
 `bun install --production`, restart systemd и проверяет `/health`; при ошибке
-откатывается на предыдущий commit.
+откатывается на предыдущий commit. После пуша сверь SHA-256 raw-файла с
+локальным `extension/dist/no-rules.user.js`.
 
 ## BBCode и карточки
 
-В чате форматируются URL, IMG (включая размеры `[IMG=width=...;height=...]`), MEDIA, VIDEO, UNFURL и USER. Остальные
-BBCode-теги не трогаются и остаются обычным текстом как есть, включая скобки. Tiptap-хвосты удаляются, поэтому карточки не растягивают
-сообщение. `market_search` приводится к legacy-карточке 24 px.
-
-Подробно: [docs/BBCode.md](docs/BBCode.md), [docs/EXTENSION.md](docs/EXTENSION.md).
+Форматируются только `URL`, `IMG`, `MEDIA`, `VIDEO`, `UNFURL`, `USER`.
+Остальные BBCode-теги не трогаются и остаются текстом вместе со скобками.
+Tiptap-хвосты удаляются, поэтому карточки не растягивают сообщение;
+`market_search` приводится к legacy-карточке 24 px. Подробно:
+[`docs/PROJECT.md`](docs/PROJECT.md#6-bbcode-и-карточки).
 
 ## Безопасность
 
-- Временный токен только `read`; сервер не может писать, банить или переводить.
+- Временный токен только `read`/`chatbox`; сервер не может писать, банить или
+  переводить.
 - Пароль, cookies, `_xfToken`, CSRF, `xf_user`, `xf_session` не уходят.
 - `basic post` для `/editor/unfurl` остаётся в браузере.
 - В БД только SHA-256 от нашей сессии; forum-JWT не хранится и не логируется.
 - Серверный и клиентский HTML-санитайзеры, rate limit, Origin allowlist,
-  лимит WS-кадра.
+  лимит WS-кадра, проверка `is_banned` при resume.
 - Медиа — только `https` и разрешённые форумные хосты.
 - IP виден nginx/Cloudflare, в SQLite не пишется.
+- Сетевые дампы, DOM-снимки, antibot, `.env`, БД и `storageState` в git не
+  попадают; из research коммитятся только JS-чанки.
+
+Полная модель угроз: [`docs/OPERATIONS.md`](docs/OPERATIONS.md#5-auth-и-безопасность).
 
 ## Тесты
 
 ```bash
 for f in extension/src/*.js; do node --check "$f"; done
 node --check extension/dist/no-rules.user.js
-cd server && npm test        # 22 tests
+cd server && npm test && npm run typecheck
 ```
 
-Playwright-сценарии: Chromium desktop/mobile, Firefox, full chat + widget, F5,
-outbox/reconnect, BBCode/cards, video/lightbox/smilies, copy, room switch.
+`npm test` — **26/26**. Playwright-сценарии: Chromium desktop/mobile, Firefox,
+full chat + widget, F5, outbox/reconnect, BBCode/cards, video/lightbox/smilies,
+copy, online/socket modals, room switch. Чек-лист:
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md#9-тестирование).
 
 ## Документация
 
-- [docs/README.md](docs/README.md) — индекс;
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — устройство;
-- [docs/EXTENSION.md](docs/EXTENSION.md) — userscript;
-- [docs/BACKEND.md](docs/BACKEND.md) — backend/DB;
-- [docs/PROTOCOL.md](docs/PROTOCOL.md) — WebSocket;
-- [docs/NATIVE-CHATBOX.md](docs/NATIVE-CHATBOX.md) — реверс Chatbox;
-- [docs/BBCode.md](docs/BBCode.md) — BBCode;
-- [docs/SECURITY.md](docs/SECURITY.md) — безопасность;
-- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — production;
-- [docs/TESTING.md](docs/TESTING.md) — проверки.
+- [`docs/PROJECT.md`](docs/PROJECT.md) — extension, native Chatbox, BBCode,
+  рендер, видео, меню, модалки, typing.
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md) — backend, протокол, БД,
+  безопасность, деплой, тесты.
+- [`docs/CHANGELOG.md`](docs/CHANGELOG.md) — архив истории версий.
+- [`FORUM-THEME.md`](FORUM-THEME.md) — текст темы/анонса для форума.
+- [`research/README.md`](research/README.md) — сохранённые JS-чанки.
 
 ## Ограничения
 
