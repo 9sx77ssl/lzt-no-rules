@@ -52,7 +52,7 @@ const config = {
   publicUrl: process.env.PUBLIC_URL || 'wss://lztws.d9v.uk/ws',
   tlsKeyPath: process.env.TLS_KEY_PATH || '',
   tlsCertPath: process.env.TLS_CERT_PATH || '',
-  version: process.env.SERVER_VERSION || '1.1.25',
+  version: process.env.SERVER_VERSION || '1.1.26',
   roomTitle: process.env.ROOM_TITLE || 'No Rules',
 
   dbPath: process.env.DB_PATH || fileURLToPath(new URL('../data/no-rules.db', import.meta.url)),

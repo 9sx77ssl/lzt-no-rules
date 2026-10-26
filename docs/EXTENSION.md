@@ -11,7 +11,7 @@ cd server
 bun install
 cd ..
 
-NR_VERSION=1.1.25 \
+NR_VERSION=1.1.26 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -266,8 +266,8 @@ document-start
 - парсит plain-text блоки Tiptap целиком, включая переносы `<br>`;
 - оставляет рабочими только `[URL]`, `[IMG]`, `[MEDIA]`, `[VIDEO]` и
   `[UNFURL]`;
-- остальные теги снимает, сохраняя текст; permission-only теги превращает
-  в muted-заглушку;
+- остальные теги не трогает: они остаются текстом как набраны, включая
+  permission-only теги;
 - вызывается при отправке и при рендере старых сообщений.
 
 `normalizeClientHtml` убирает Tiptap-хвосты (`ProseMirror-widget`, лишний
@@ -307,7 +307,8 @@ reconnect и отдельным тестовым WebSocket-подключени�
 - `[USER=id]@nick[/USER]`;
 - plain text — как есть.
 - Форматирование вроде `[B]`, `[COLOR]`, `[QUOTE]`, `[LIST]` в новых
-  сообщениях снимается в plain; старые HTML-сообщения не переписываются.
+  сообщениях остаётся текстом со скобками; старые HTML-сообщения не
+  переписываются.
 
 Копирование не показывает toast; ошибки только `console.debug`.
 

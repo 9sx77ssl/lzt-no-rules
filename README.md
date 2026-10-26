@@ -8,7 +8,7 @@ Tiptap, reply/edit-бары, контекстное меню и мобильны
 - Репозиторий: <https://github.com/9sx77ssl/lzt-no-rules>
 - WSS: `wss://lztws.d9v.uk/ws`
 - Health: <https://lztws.d9v.uk/health> · Version: <https://lztws.d9v.uk/version>
-- Версия: **1.1.25**
+- Версия: **1.1.26**
 
 > Это не E2E. Сообщения хранятся в SQLite у владельца сервера. Пароль,
 > cookies форума и платёжные данные на backend не отправляются.
@@ -20,7 +20,7 @@ Tiptap, reply/edit-бары, контекстное меню и мобильны
   одинаковые сообщения подряд.
 - Нативные карточки: market-разделы 24 px, форумные/медиа/аккаунты, фото
   через fancybox, XenForo-плеер, смайлы 96×96.
-- BBCode: URL, IMG, MEDIA, VIDEO и UNFURL. Остальные теги снимаются в plain-текст; permission-теги — безопасная заглушка.
+- BBCode: URL, IMG, MEDIA, VIDEO и UNFURL. Все остальные теги остаются обычным текстом как есть, вместе со скобками.
 - История, unread, typing, онлайн, мобильный вид и сохранение скролла при
   переключении комнат.
 - Outbox переживает обрыв и F5; `clientId` не даёт создать дубль; после
@@ -104,7 +104,7 @@ bun run start
 ## Сборка и релиз
 
 ```bash
-NR_VERSION=1.1.25 \
+NR_VERSION=1.1.26 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -120,9 +120,8 @@ cd server && npm test
 
 ## BBCode и карточки
 
-В чате работают только URL, IMG, MEDIA, VIDEO и UNFURL. Остальные BBCode-теги
-снимаются, текст остаётся plain; закрытые форумные теги показываются как
-muted-заглушка. Tiptap-хвосты удаляются, поэтому карточки не растягивают
+В чате форматируются только URL, IMG, MEDIA, VIDEO и UNFURL. Остальные
+BBCode-теги не трогаются и остаются обычным текстом как есть, включая скобки. Tiptap-хвосты удаляются, поэтому карточки не растягивают
 сообщение. `market_search` приводится к legacy-карточке 24 px.
 
 Подробно: [docs/BBCode.md](docs/BBCode.md), [docs/EXTENSION.md](docs/EXTENSION.md).

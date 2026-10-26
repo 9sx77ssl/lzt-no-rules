@@ -320,7 +320,7 @@ F5 и в reply.
   строит корректную `.embed-link` карточку.
 
 No Rules оставляет в чате только реально работающие теги: `[URL]`, `[IMG]`,
-`[MEDIA]`, `[VIDEO]`, `[UNFURL]`. Остальные снимаются в plain-текст; это
+`[MEDIA]`, `[VIDEO]`, `[UNFURL]`. Остальные остаются текстом как есть; это
 сделано осознанно после проверки реальных сообщений. Подробнее —
 [BBCode.md](BBCode.md).
 
@@ -339,7 +339,7 @@ Plain `@nick` не является Tiptap-нодой. При отправке N
   (`url.startsWith`), поэтому передаётся **строка**.
 - `XenForo.activate` берётся через `PAGE_WINDOW`/`unsafeWindow`.
 - Firefox/Tampermonkey content-script WebSocket может прислать
-  `Origin: null`. Сервер с 1.1.19+ (сейчас 1.1.25) трактует его как missing origin
+  `Origin: null`. Сервер с 1.1.19+ (сейчас 1.1.26) трактует его как missing origin
   (`ALLOW_MISSING_ORIGIN`), иначе handshake падал с 403 и в UI было
   «Онлайн: 0».
 - В Tampermonkey не должно быть двух копий No Rules: старые

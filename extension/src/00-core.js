@@ -1644,38 +1644,13 @@ function bbcodeMediaUrl(value, inner) {
   return '';
 }
 
-const BBCODE_RESTRICTED = new Set([
-  'api',
-  'censor',
-  'club',
-  'days',
-  'exceptids',
-  'lang',
-  'likes',
-  'likes2',
-  'tooltip',
-  'userids',
-  'visitor',
-]);
-
 const BBCODE_RENDER_TAGS = new Set(['img', 'media', 'unfurl', 'url', 'video']);
 
 function bbcodeElement(tag, value, inner) {
   const name = String(tag || '').toLowerCase();
-  if (BBCODE_RESTRICTED.has(name)) {
-    const el = document.createElement('span');
-    el.className = 'muted';
-    el.textContent = 'Скрытый контент форума недоступен';
-    return el;
-  }
-  if (!BBCODE_RENDER_TAGS.has(name)) {
-    if (name === 'plain' || name === 'code' || name === 'pre' || name === 'php' || name === 'html' || name === 'src') {
-      return document.createTextNode(String(inner || '').replace(/<br\s*\/?>/gi, '\n'));
-    }
-    if (name === 'hr') return document.createTextNode('\n');
-    const plain = String(inner || '').replace(/\[\*\]/gi, '\n');
-    return parseBbcodeFragment(plain);
-  }
+  // Everything outside this allowlist stays exactly as typed, brackets and
+  // all. Only real message primitives are converted to DOM.
+  if (!BBCODE_RENDER_TAGS.has(name)) return null;
   switch (name) {
     case 'b':
     case 'strong': {
