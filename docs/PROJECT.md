@@ -30,7 +30,7 @@ scripts/
 Сборка склеивает модули в один IIFE в фиксированном порядке:
 
 ```bash
-NR_VERSION=1.3.4 \
+NR_VERSION=1.3.5 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -308,7 +308,8 @@ lightbox. Два смайла или смайл с текстом остаютс
 В редакторе Tiptap смайлы-картинки принудительно приводятся к нативным
 32×32 px (SVG/WebP/разные intrinsic sizes не влияют). После отправки
 `clearContent()` очищает все NodeView, а запоздавший кадр Tiptap
-перепроверяется без стирания нового пользовательского ввода. Редактирование
+перепроверяется и удаляет осиротевшие `.node-image`/`.node-smilie`-обёртки
+без стирания нового пользовательского ввода. Редактирование
 ставит курсор в конец сообщения (`focus('end')`).
 
 ## 8. Unfurl, market и `/editor/unfurl`
