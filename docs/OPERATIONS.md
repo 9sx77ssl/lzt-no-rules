@@ -42,7 +42,7 @@ GET /health
 {
   "ok": true,
   "name": "no-rules-chat",
-  "version": "1.3.9",
+  "version": "1.3.10",
   "protocol": 1,
   "uptime": 123,
   "online": 2,
@@ -53,7 +53,7 @@ GET /health
 GET /version
 {
   "name": "no-rules-chat",
-  "version": "1.3.9",
+  "version": "1.3.10",
   "protocol": 1,
   "publicUrl": "wss://lztws.d9v.uk/ws"
 }
@@ -66,7 +66,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 
 ## 3. Протокол
 
-Версия протокола: **1**. Клиент и сервер: **1.3.9**. Транспорт — WebSocket,
+Версия протокола: **1**. Клиент и сервер: **1.3.10**. Транспорт — WebSocket,
 текстовые кадры JSON.
 
 ### Подключение
@@ -75,7 +75,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 2. Сервер присылает `hello`:
 
 ```json
-{"type":"hello","protocol":1,"version":"1.3.9","roomTitle":"No Rules","serverTime":1792946496011}
+{"type":"hello","protocol":1,"version":"1.3.10","roomTitle":"No Rules","serverTime":1792946496011}
 ```
 
 3. Клиент отправляет `auth` (первый вход) или `resume` (есть сессия).
@@ -87,7 +87,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
   "type": "auth",
   "token": "<temporary forum JWT>",
   "accessKey": "<shared extension key>",
-  "clientVersion": "1.3.9"
+  "clientVersion": "1.3.10"
 }
 ```
 
@@ -121,7 +121,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 ### resume
 
 ```json
-{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.3.9"}
+{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.3.10"}
 ```
 
 Ответ такой же `auth.ok`; поле `resumed` есть только в логах сервера.
@@ -736,7 +736,7 @@ Playwright-сценарии лежат вне репозитория из-за `
 ### Сборка
 
 ```bash
-NR_VERSION=1.3.9 \
+NR_VERSION=1.3.10 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -944,8 +944,9 @@ production `.env` и реальные ID всё равно не должны п�
 
 Полный архив — [`CHANGELOG.md`](CHANGELOG.md). Ключевые вехи:
 
-- **1.3.9** — у заголовков и `.sectionMain` модалок убран `border-radius`;
-  углы больше не ломаются темой форума.
+- **1.3.10** — модалки приведены к нативному радиусу XenForo: 12px shell
+  и 12px top heading, без двойного радиуса.
+- **1.3.9** — экспериментальное удаление radius (отменено).
 - **1.3.8** — Firefox: `@sandbox raw` и безопасный `wrappedJSObject`-доступ
   к editor-командам без callback-ов; очистка смайлов/курсор в конце.
 - **1.3.7** — убран опасный `editor.on`-callback из sandbox (Permission

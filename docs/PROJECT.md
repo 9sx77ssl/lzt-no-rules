@@ -30,7 +30,7 @@ scripts/
 Сборка склеивает модули в один IIFE в фиксированном порядке:
 
 ```bash
-NR_VERSION=1.3.9 \
+NR_VERSION=1.3.10 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -440,8 +440,9 @@ mountNativeModal({
 Обе модалки используют одинаковые `opacity`/`translateY` transition и
 backdrop-анимацию; отдельного `prefers-reduced-motion`-исключения только для
 онлайн-модалки больше нет, поэтому открытие/закрытие не отличаются от
-`Отладки сокета`. Заголовки и `.sectionMain` внутри No Rules-модалок имеют
-`border-radius: 0`, чтобы тема форума не ломала углы своим 12px top-radius.
+`Отладки сокета`. Заголовки и `.sectionMain` внутри No Rules-модалок повторяют нативный
+XenForo: `.sectionMain` — 12px, `.heading` — `12px 12px 0 0`. Старое
+сочетание 8px shell + 12px heading давало двойной видимый радиус.
 
 Онлайн-модалка — XenForo `modal > xenOverlay` с нативными
 `top-users-container`, `top-user-item lztng-yzgsen`, `user-abour-container`,

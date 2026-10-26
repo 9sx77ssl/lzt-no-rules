@@ -467,15 +467,17 @@ body.nr-online-modal-open { overflow: hidden; }
   border-radius: 8px;
   overflow: hidden;
 }
-/* The forum theme can inject a 12px top radius into modal headings; it clips
-   badly inside 638px overlays. Keep No Rules modals square. */
+/* Match the native XenForo overlay: 12px shell and 12px heading top corners.
+   The old 8px shell + theme's 12px heading produced the visible double edge. */
 .no-rules-online-modal .xenOverlay .sectionMain,
+.no-rules-socket-modal .xenOverlay .sectionMain {
+  border-radius: 12px !important;
+}
 .no-rules-online-modal .xenOverlay .section .heading,
 .no-rules-online-modal .xenOverlay .sectionMain .heading,
-.no-rules-socket-modal .xenOverlay .sectionMain,
 .no-rules-socket-modal .xenOverlay .section .heading,
 .no-rules-socket-modal .xenOverlay .sectionMain .heading {
-  border-radius: 0 !important;
+  border-radius: 12px 12px 0 0 !important;
 }
 .no-rules-socket-modal .helper {
   padding: 0;
