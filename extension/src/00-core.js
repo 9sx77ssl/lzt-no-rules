@@ -969,13 +969,17 @@ function getEditorElement() {
 function getTiptap() {
   const element = getEditorElement();
   if (!element) return null;
-  try {
-    const editor = element.editor;
-    return editor && typeof editor.getHTML === 'function' ? editor : null;
-  } catch {
-    // Sandbox/Xray wrappers must not pass sandbox callbacks into ProseMirror.
-    return null;
+  const candidates = [];
+  try { candidates.push(element.editor); } catch { /* Xray/expando */ }
+  try { candidates.push(element.wrappedJSObject?.editor); } catch { /* Xray/expando */ }
+  for (const editor of candidates) {
+    try {
+      if (editor && typeof editor.getHTML === 'function') return editor;
+    } catch {
+      // Try the next wrapper.
+    }
   }
+  return null;
 }
 
 function placeCaretAtEnd(element) {

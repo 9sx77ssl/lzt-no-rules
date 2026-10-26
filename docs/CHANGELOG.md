@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.8
+
+- Firefox/Tampermonkey: добавлен `@sandbox raw`; editor-команды доступны
+  через `wrappedJSObject`, но callback-и в ProseMirror не передаются.
+- Это чинит оставшийся смайл и возвращает очистку редактора в Firefox.
+- Сервер и extension: `1.3.8`.
+
 ## 1.3.7
 
 - Исправлен срочный Firefox-регресс: sandbox-функция больше не передаётся в

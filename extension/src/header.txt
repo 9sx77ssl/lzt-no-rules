@@ -11,6 +11,7 @@
 // @run-at       document-start
 // @grant        none
 // @unwrap
+// @sandbox      raw
 // @inject-into page
 // @noframes
 // @homepageURL  https://lolz.team/gay1234
