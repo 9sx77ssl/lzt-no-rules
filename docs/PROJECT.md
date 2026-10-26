@@ -30,7 +30,7 @@ scripts/
 Сборка склеивает модули в один IIFE в фиксированном порядке:
 
 ```bash
-NR_VERSION=1.3.0 \
+NR_VERSION=1.3.1 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -372,8 +372,9 @@ Legacy market-карточка:
 самом низу. `ResizeObserver` следит за высотой групп, `img.load` — за
 поздней загрузкой картинок; `scrollToBottom()` вызывается после layout.
 Ручной wheel/touch/pointer/PageUp сразу отключает follow-режим, чтобы не
-выдёргивать пользователя из истории. У `#no-rules-messages.nr-own-scroll`
-есть нижний отступ 16 px, поэтому последняя строка не прилипает к composer-у.
+выдёргивать пользователя из истории. Дополнительного нижнего padding нет:
+последнее сообщение отделяется нативным `chat2-typingDetails` (23 px + 8 px),
+как в оригинальном Chatbox (`padding-bottom: 0` у `.chat2-messages`).
 
 ### Pending и ошибки
 

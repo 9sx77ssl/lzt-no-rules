@@ -38,8 +38,6 @@ const NR_CSS = `
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-bottom: 16px;
-  scroll-padding-bottom: 16px;
   scrollbar-width: thin;
   overscroll-behavior: contain;
 }

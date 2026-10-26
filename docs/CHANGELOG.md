@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1
+
+- Убран лишний 16 px `padding-bottom` у собственного scroll-контейнера:
+  последнее сообщение снова отделяется от composer-а нативным
+  `chat2-typingDetails` (23 px + 8 px), без искусственной дыры.
+- Сервер и extension: `1.3.1`.
+
 ## 1.3.0
 
 - Жёсткий лимит **512 Unicode code points** для composer-а, `message.send` и
