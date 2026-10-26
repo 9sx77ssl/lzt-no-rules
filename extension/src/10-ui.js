@@ -1440,6 +1440,40 @@ function attachScrollListener() {
   }
 }
 
+function bindAvatarFallback(avatar) {
+  if (!avatar || avatar.dataset.nrAvatarFallback === '1') return;
+  avatar.dataset.nrAvatarFallback = '1';
+  const img = avatar.querySelector('img');
+  if (!img) return;
+  img.addEventListener('error', () => {
+    if (img.src !== DEFAULT_AVATAR) img.src = DEFAULT_AVATAR;
+  });
+}
+
+function updateAvatar(avatar, user) {
+  if (!avatar) return createAvatar(user);
+  avatar.className = `chat2-group-avatar Av${Number(user?.id) || 0}s ${HASH.footer}`;
+  avatar.setAttribute('role', 'button');
+  avatar.tabIndex = 0;
+  avatar.dataset.userId = String(user?.id || '');
+  avatar.setAttribute('aria-label', `Ответить ${user?.username || ''}`);
+  const img = avatar.querySelector('img');
+  if (img) {
+    const next = user?.avatar || DEFAULT_AVATAR;
+    if (img.getAttribute('src') !== next) img.setAttribute('src', next);
+    img.className = state.templates?.avatarImg || HASH.footer;
+    img.loading = 'lazy';
+    img.alt = `avatar ${user?.username || ''}`;
+  }
+  if (!avatar.querySelector('.chat2-tag')) {
+    const tag = document.createElement('div');
+    tag.className = state.templates?.tag || `chat2-tag ${HASH.footer}`;
+    avatar.appendChild(tag);
+  }
+  bindAvatarFallback(avatar);
+  return avatar;
+}
+
 function createAvatar(user) {
   const avatar = document.createElement('div');
   avatar.className = `chat2-group-avatar Av${Number(user?.id) || 0}s ${HASH.footer}`;
@@ -1452,9 +1486,7 @@ function createAvatar(user) {
   img.loading = 'lazy';
   img.alt = `avatar ${user?.username || ''}`;
   img.src = user?.avatar || DEFAULT_AVATAR;
-  img.addEventListener('error', () => {
-    if (img.src !== DEFAULT_AVATAR) img.src = DEFAULT_AVATAR;
-  });
+  bindAvatarFallback(avatar);
   avatar.appendChild(img);
   const tag = document.createElement('div');
   tag.className = state.templates?.tag || `chat2-tag ${HASH.footer}`;
@@ -1492,12 +1524,12 @@ function messageRenderKey(message, showHeader) {
   ]);
 }
 
-function createGroup(messages, { dayLabel = null, tagged = false, renderMessage = null } = {}) {
+function createGroup(messages, { dayLabel = null, tagged = false, renderMessage = null, avatar = null } = {}) {
   const first = messages[0];
   const group = document.createElement('div');
   group.className = state.templates?.group || `chat2-message-group ${HASH.footer}`;
   group.dataset.userId = String(first.user.id);
-  group.appendChild(createAvatar(first.user));
+  group.appendChild(avatar || createAvatar(first.user));
 
   const content = document.createElement('div');
   content.className = state.templates?.groupContent || `chat2-message-group-content ${HASH.footer}`;

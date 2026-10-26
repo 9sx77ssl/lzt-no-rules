@@ -58,6 +58,29 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
     const id = element.dataset.messageId;
     if (id) existingMessages.set(id, element);
   }
+  // Keep the already loaded avatar nodes alive across optimistic sends. A new
+  // <img> for the same URL makes the browser re-decode/re-composite it and
+  // looks like the avatar is twitching.
+  const existingAvatars = new Map();
+  for (const group of container.querySelectorAll('.chat2-message-group[data-user-id]')) {
+    const id = String(group.dataset.userId || '');
+    if (!id || existingAvatars.has(id)) continue;
+    const avatar = group.querySelector(':scope > .chat2-group-avatar');
+    if (!avatar) continue;
+    avatar.remove();
+    existingAvatars.set(id, avatar);
+  }
+  const usedAvatars = new Set();
+  const takeAvatar = (user) => {
+    const id = String(user?.id || '');
+    const cached = existingAvatars.get(id);
+    if (!cached) return createAvatar(user);
+    if (!usedAvatars.has(id)) {
+      usedAvatars.add(id);
+      return updateAvatar(cached, user);
+    }
+    return updateAvatar(cached.cloneNode(true), user);
+  };
   const renderMessage = (message, showHeader) => {
     const id = String(message.id);
     const key = messageRenderKey(message, showHeader);
@@ -112,6 +135,7 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
           dayLabel: separatorLabel,
           tagged: group.tagged,
           renderMessage,
+          avatar: takeAvatar(first.user),
         }),
       );
       lastDay = group.dayKey;
