@@ -27,11 +27,14 @@ export function createHttpServer({ config, db, logger, getOnline }) {
     }
 
     if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'access-control-allow-origin': req.headers.origin || '*',
-        'access-control-allow-methods': 'GET, OPTIONS',
+      const origin = typeof req.headers.origin === 'string' ? req.headers.origin : '';
+      const allowed = config.allowedOrigins.includes(origin);
+      res.writeHead(allowed ? 204 : 403, {
+        ...(allowed ? { 'access-control-allow-origin': origin } : {}),
+        'access-control-allow-methods': 'GET, HEAD, OPTIONS',
         'access-control-allow-headers': 'content-type',
         'access-control-max-age': '86400',
+        vary: 'Origin',
       });
       res.end();
       return;
@@ -94,7 +97,8 @@ export function createHttpServer({ config, db, logger, getOnline }) {
       : http.createServer(handler);
 
   server.on('clientError', (error, socket) => {
-    logger.debug('http.client_error', { error: error?.code || 'client_error' });
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : 'client_error';
+    logger.debug('http.client_error', { error: code });
     if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\\r\\n\\r\\n');
   });
 

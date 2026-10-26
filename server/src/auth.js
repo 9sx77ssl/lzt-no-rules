@@ -28,9 +28,12 @@ export function decodeJwtPayload(token) {
 }
 
 function normalizeScopes(scope) {
-  if (Array.isArray(scope)) return scope.map(String);
-  if (typeof scope === 'string') return scope.split(/[\s,]+/).filter(Boolean);
-  return [];
+  const values = Array.isArray(scope)
+    ? scope.map(String)
+    : typeof scope === 'string'
+      ? scope.split(/[\s,]+/)
+      : [];
+  return [...new Set(values.map((value) => value.trim().toLowerCase()).filter(Boolean))];
 }
 
 function safeCount(value) {
@@ -170,7 +173,10 @@ export class AuthService {
     const scopes = normalizeScopes(payload.scope);
     const hasReadScope = scopes.some((scope) => scope === 'read' || scope === 'chatbox');
     const hasPostScope = scopes.includes('post');
-    if (scopes.length > 0 && (!hasReadScope || hasPostScope)) {
+    // Never accept an unscoped token: it would turn a generic forum token
+    // into chat access. The temporary token must explicitly grant read/chatbox
+    // and must not grant post.
+    if (!hasReadScope || hasPostScope) {
       throw new AuthError('invalid_token', 'Для входа нужен read-only токен');
     }
 
@@ -231,6 +237,7 @@ export class AuthService {
       username: usernameMeta.username,
       usernameHtml: usernameMeta.usernameHtml,
       color: usernameMeta.color,
+      isBanned: normalized.isBanned,
       avatar: normalized.avatar,
       profileUrl: normalized.profileUrl,
       shortLink: normalized.shortLink,
@@ -292,12 +299,13 @@ export class AuthService {
     };
   }
 
-  async authenticate({ temporaryToken, sessionToken, accessKey, ip = 'unknown' }) {
+  async authenticate({ temporaryToken = '', sessionToken = '', accessKey = '', ip = 'unknown' } = {}) {
+    // Count every attempt, including wrong/absent access keys, so the public
+    // shared key cannot be brute-forced without a per-IP limit.
+    this.checkAuthRate(ip);
     if (!this.verifyAccessKey(accessKey)) {
       throw new AuthError('access_denied', 'Доступ запрещён');
     }
-
-    this.checkAuthRate(ip);
 
     if (sessionToken) {
       const resumed = this.resumeSession(sessionToken);

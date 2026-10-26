@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.6
+
+- Security hardening: временный JWT без `read`/`chatbox` scope и токены с
+  `post` отклоняются; auth-rate-limit расходуется даже на неверный `ACCESS_KEY`.
+- `message.report` получил отдельный rate limit, `history.limit` нормализуется
+  до целого; `is_banned` теперь хранится в `users` и проверяется при resume.
+- Санитайзер вырезает `data-href`/`data-url`/`data-proxy-href`/
+  `data-fallback-src` с не-http(s) URL, внешний `poster`, `url(...)` в inline
+  CSS, `data-tippy-content`, SVG-анимации в сообщениях и небезопасные
+  spoiler `data-target`.
+- Клиентский sanitizer и иконки unfurl больше не принимают event handlers/
+  внешние SVG-анимации.
+- CORS preflight разрешён только для `ALLOWED_ORIGINS`.
+- Добавлен `tsconfig.json` с `allowJs` + `checkJs`, `bun-sqlite.d.ts` и
+  `npm run typecheck` / `bun run typecheck`; серверные тесты расширены.
+- Сервер и extension: `1.2.6`.
+
 ## 1.2.5
 
 - Аватарки групп больше не пересоздаются на каждый optimistic send: готовый

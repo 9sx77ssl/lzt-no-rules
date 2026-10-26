@@ -68,7 +68,8 @@ class CookieJar {
 }
 
 export class AntibotClient {
-  constructor({ fetchImpl = globalThis.fetch, userAgent, logger = null } = {}) {
+  /** @param {{fetchImpl?: typeof fetch, userAgent?: string, logger?: any}} [options] */
+  constructor({ fetchImpl = globalThis.fetch, userAgent = undefined, logger = null } = {}) {
     this.fetchImpl = fetchImpl;
     this.logger = logger;
     this.jar = new CookieJar();

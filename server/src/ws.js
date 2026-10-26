@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { isIP } from 'node:net';
 import { WebSocket, WebSocketServer } from 'ws';
 import { AuthError } from './auth.js';
 import { MessageError } from './sanitize.js';
@@ -21,12 +22,28 @@ class ClientError extends Error {
   }
 }
 
+function normalizedIp(value) {
+  const raw = String(value || '').trim().replace(/^\[|\]$/g, '');
+  if (!raw) return '';
+  return isIP(raw) ? raw : '';
+}
+
 function getIp(req, config) {
   if (config.trustProxy) {
+    // nginx writes both headers from its trusted client-IP map. Prefer
+    // X-Real-IP; never take the first element of an attacker-supplied XFF
+    // chain without validating it.
+    const real = normalizedIp(req?.headers?.['x-real-ip']);
+    if (real) return real;
     const forwarded = req?.headers?.['x-forwarded-for'];
-    if (typeof forwarded === 'string' && forwarded) return forwarded.split(',')[0].trim();
+    if (typeof forwarded === 'string') {
+      for (const item of forwarded.split(',').reverse()) {
+        const ip = normalizedIp(item);
+        if (ip) return ip;
+      }
+    }
   }
-  return req?.socket?.remoteAddress || 'unknown';
+  return normalizedIp(req?.socket?.remoteAddress) || 'unknown';
 }
 
 function closeSoon(ws, code, reason, delay = 500) {
@@ -157,14 +174,15 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
       ws.authenticatedAt = Date.now();
       db.touchUser(result.user.id);
 
+      const users = onlineUsers();
       send(ws, {
         type: ServerType.AUTH_OK,
         protocol: PROTOCOL_VERSION,
         user: result.user,
         session: result.sessionToken,
         expiresAt: result.expiresAt,
-        online: onlineUsers().length,
-        users: onlineUsers(),
+        online: users.length,
+        users,
         serverTime: Date.now(),
       });
       sendPresence(ws);
@@ -397,7 +415,10 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
     }
     const limit = Math.max(
       1,
-      Math.min(Number(data.limit) || config.historyPageSize, config.maxHistoryPageSize),
+      Math.min(
+        Math.floor(Number(data.limit) || config.historyPageSize),
+        config.maxHistoryPageSize,
+      ),
     );
     const result = db.getHistory({ before, after, near, limit });
     send(ws, {
@@ -430,6 +451,12 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
   }
 
   function handleReport(ws, data) {
+    const rate = limiters.report.check(`report:${ws.user.id}`, config.rate.report);
+    if (!rate.ok) {
+      throw new ClientError('rate_limited', 'Слишком часто. Подождите немного.', {
+        retryAfterMs: rate.retryAfterMs,
+      });
+    }
     const id = safeInteger(data.id);
     if (!id) throw new ClientError('bad_request', 'Некорректный id сообщения');
     const target = db.getMessage(id);
@@ -642,7 +669,8 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
         // ignore
       }
     }
-    return new Promise((resolve) => wss.close(() => resolve()));
+    /** @type {Promise<void>} */
+    return new Promise((resolve) => wss.close(() => resolve(undefined)));
   }
 
   return {

@@ -92,5 +92,6 @@ export function createRateLimiters(config, logger) {
     history: new RateLimiter({ logger }),
     edit: new RateLimiter({ logger }),
     delete: new RateLimiter({ logger }),
+    report: new RateLimiter({ logger }),
   };
 }

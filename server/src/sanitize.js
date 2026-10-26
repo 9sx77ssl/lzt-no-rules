@@ -215,6 +215,10 @@ const USERNAME_SVG_ATTRIBUTES = {
   ],
 };
 
+const MESSAGE_SVG_TAGS = USERNAME_SVG_TAGS.filter(
+  (tag) => tag !== 'animate' && tag !== 'animateTransform',
+);
+
 const SAFE_ANIMATED_ATTRIBUTES = new Set([
   'transform',
   'stroke',
@@ -249,7 +253,13 @@ function sanitizeUsernameIcon(svgHtml) {
   const $ = cheerio.load(clean, null, false);
   $('animate, animateTransform').each((_, element) => {
     const name = $(element).attr('attributeName');
-    if (!SAFE_ANIMATED_ATTRIBUTES.has(String(name || ''))) $(element).remove();
+    if (!SAFE_ANIMATED_ATTRIBUTES.has(String(name || ''))) {
+      $(element).remove();
+      return;
+    }
+    if (['values', 'from', 'to', 'by'].some((key) => /url\s*\(|javascript:/i.test($(element).attr(key) || ''))) {
+      $(element).remove();
+    }
   });
   $('script, style, foreignObject, use, image').remove();
   clean = $.html();
@@ -478,7 +488,7 @@ export function createSanitizer(options = {}) {
     'video',
     'source',
     'button',
-    ...USERNAME_SVG_TAGS,
+    ...MESSAGE_SVG_TAGS,
   ];
 
   const allowedAttributes = {
@@ -510,12 +520,11 @@ export function createSanitizer(options = {}) {
       'data-url',
       'data-fallback-src',
     ],
-    abbr: ['title', 'class', 'data-tippy-content', 'data-cachedtitle'],
+    abbr: ['title', 'class'],
     span: [
       'class',
       'style',
       'data-user',
-      'data-cachedtitle',
       'data-url',
       'data-node-view-wrapper',
       'data-title',
@@ -639,6 +648,38 @@ export function createSanitizer(options = {}) {
     }
 
     const $ = cheerio.load(sanitized, null, false);
+    // sanitize-html validates href/src but not custom URL attributes. They are
+    // read by the native lightbox/unfurl code, so keep only absolute http(s).
+    const urlAttributes = ['data-href', 'data-proxy-href', 'data-url', 'data-fallback-src'];
+    $('*').each((_, element) => {
+      for (const attribute of urlAttributes) {
+        const value = $(element).attr(attribute);
+        if (value == null) continue;
+        if (!/^https?:\/\//i.test(String(value).trim())) $(element).removeAttr(attribute);
+      }
+      const tag = String($(element).prop('tagName') || '').toLowerCase();
+      if (tag === 'video') {
+        const poster = $(element).attr('poster');
+        if (poster && !isAllowedMediaUrl(poster, { allowExternalImages })) {
+          $(element).removeAttr('poster');
+        }
+      }
+      const style = $(element).attr('style');
+      if (style && /url\s*\(|expression\s*\(|javascript:/i.test(style)) {
+        $(element).removeAttr('style');
+      }
+      for (const attribute of ['fill', 'stroke']) {
+        const value = $(element).attr(attribute);
+        if (value && /url\s*\(|javascript:/i.test(value)) $(element).removeAttr(attribute);
+      }
+      if (tag === 'button') {
+        const target = $(element).attr('data-target');
+        if (target && !/^>\s*\.SpoilerTarget$/.test(String(target).trim())) {
+          $(element).removeAttr('data-target');
+        }
+      }
+    });
+    const sanitizedWithSafeUrls = $.html();
     const imageCount = $('img').not('.mceSmilie, .mceSmilieLarge, .avatar').length;
     const linkCount = $('a[href]').not('.mention').length;
     const mentionCount = $('a.mention, span.mention, a.username.mention').length;
@@ -664,7 +705,7 @@ export function createSanitizer(options = {}) {
     }
 
     return {
-      html: sanitized,
+      html: sanitizedWithSafeUrls,
       text,
       clientId,
       meta: {

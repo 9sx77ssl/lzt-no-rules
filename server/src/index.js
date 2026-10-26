@@ -41,11 +41,12 @@ export function createApplication(overrides = {}) {
 
   async function listen() {
     if (listening) return httpServer.address();
+    /** @type {Promise<void>} */
     await new Promise((resolve, reject) => {
       httpServer.once('error', reject);
       httpServer.listen(config.port, config.host, () => {
         httpServer.off('error', reject);
-        resolve();
+        resolve(undefined);
       });
     });
     listening = true;
@@ -77,11 +78,12 @@ export function createApplication(overrides = {}) {
       logger.warn('server.ws_close_failed', { error: error?.name || 'error' });
     }
     if (listening) {
+      /** @type {Promise<void>} */
       await new Promise((resolve) => {
-        httpServer.close(() => resolve());
+        httpServer.close(() => resolve(undefined));
         setTimeout(() => {
           httpServer.closeAllConnections?.();
-          resolve();
+          resolve(undefined);
         }, 2_000).unref?.();
       });
     }

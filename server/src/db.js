@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   username_html TEXT,
   avatar_url TEXT,
   color TEXT,
+  is_banned INTEGER NOT NULL DEFAULT 0,
   stats TEXT,
   stats_updated_at INTEGER,
   created_at INTEGER NOT NULL,
@@ -122,6 +123,7 @@ export function rowToUser(row) {
     usernameHtml: row.username_html || '',
     avatar: row.avatar_url || null,
     color: row.color || null,
+    isBanned: Boolean(row.is_banned),
     profileUrl: `https://lolz.team/members/${row.user_id}/`,
     stats: parseMeta(row.stats) || {
       likes: 0,
@@ -136,7 +138,8 @@ export function rowToUser(row) {
   };
 }
 
-export function openDatabase({ path, logger }) {
+/** @param {{ path: string, logger?: any }} options */
+export function openDatabase({ path, logger = null }) {
   if (!path) throw new Error('Database path is required');
   mkdirSync(dirname(path), { recursive: true });
 
@@ -175,8 +178,11 @@ export function openDatabase({ path, logger }) {
   if (!userColumns.has('stats_updated_at')) {
     db.exec('ALTER TABLE users ADD COLUMN stats_updated_at INTEGER');
   }
-  if (version <= 4) db.exec('PRAGMA user_version = 5');
-  else if (version > 5) {
+  if (!userColumns.has('is_banned')) {
+    db.exec('ALTER TABLE users ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0');
+  }
+  if (version <= 5) db.exec('PRAGMA user_version = 6');
+  else if (version > 6) {
     throw new Error(`Unsupported database schema version ${version}`);
   }
 
@@ -203,13 +209,14 @@ export function openDatabase({ path, logger }) {
 
   const stmts = {
     upsertUser: prepare(`
-      INSERT INTO users (user_id, username, username_html, avatar_url, color, stats, stats_updated_at, created_at, updated_at, last_seen_at)
-      VALUES (@user_id, @username, @username_html, @avatar_url, @color, @stats, @now, @now, @now, @now)
+      INSERT INTO users (user_id, username, username_html, avatar_url, color, is_banned, stats, stats_updated_at, created_at, updated_at, last_seen_at)
+      VALUES (@user_id, @username, @username_html, @avatar_url, @color, @is_banned, @stats, @now, @now, @now, @now)
       ON CONFLICT(user_id) DO UPDATE SET
         username = excluded.username,
         username_html = excluded.username_html,
         avatar_url = excluded.avatar_url,
         color = excluded.color,
+        is_banned = excluded.is_banned,
         stats = excluded.stats,
         stats_updated_at = excluded.stats_updated_at,
         updated_at = excluded.updated_at,
@@ -292,6 +299,7 @@ export function openDatabase({ path, logger }) {
       username_html: user.usernameHtml || '',
       avatar_url: user.avatar || null,
       color: user.color || null,
+      is_banned: user.isBanned ? 1 : 0,
       stats: JSON.stringify(user.stats || {}),
       now,
     });

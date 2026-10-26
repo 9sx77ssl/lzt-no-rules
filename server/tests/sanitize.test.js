@@ -62,7 +62,7 @@ test('enforces image limits', () => {
   ).join('');
   assert.throws(
     () => sanitizer.sanitizeMessage(`<p>${images}</p>`),
-    (error) => error.code === 'too_many_images',
+    (/** @type {any} */ error) => error.code === 'too_many_images',
   );
 });
 
@@ -111,4 +111,25 @@ test('keeps dragged image inside href-less editor anchor and clamps dimensions',
   assert.match(result.html, /<img[^>]+width="5000"/);
   assert.match(result.html, /<img[^>]+height="40"/);
   assert.equal(result.meta.images, 1);
+});
+
+
+test('strips unsafe URL attributes, tooltip HTML and SVG animation', () => {
+  const result = sanitizer.sanitizeMessage(
+    '<p><a href="https://lolz.team/x" data-href="https://lolz.team/misc/lightbox" data-proxy-href="javascript:alert(2)" data-tippy-content="<img src=x onerror=alert(3)>">x</a></p>' +
+      '<p><video src="https://nztcdn.com/files/a.mp4" poster="https://evil.example/p.jpg"></video></p>' +
+      '<p><svg viewBox="0 0 10 10"><animate attributeName="href" values="javascript:alert(1)"></animate><path d="M0 0"></path></svg></p>',
+  );
+  assert.doesNotMatch(result.html, /javascript:|data-tippy-content|evil\.example|<animate/i);
+  assert.match(result.html, /data-href="https:\/\/lolz\.team\/misc\/lightbox"/);
+});
+
+
+
+test('removes CSS url() payloads and unsafe spoiler targets', () => {
+  const result = sanitizer.sanitizeMessage(
+    '<p><span style="background:linear-gradient(red,url(https://evil.example/x));color:red">x</span></p>' +
+      '<p><button class="bbCodeSpoilerButton ToggleTrigger" data-target="body">bad</button></p>',
+  );
+  assert.doesNotMatch(result.html, /url\(|evil\.example|data-target="body"/i);
 });

@@ -1,12 +1,12 @@
 {
   "name": "no-rules-chat-server",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "private": true,
   "type": "module",
   "description": "WebSocket/HTTP backend for the No Rules Chatbox room",
   "main": "src/index.js",
   "engines": {
-    "bun": ">=1.2.5",
+    "bun": ">=1.2.6",
     "node": ">=20.11"
   },
   "scripts": {
@@ -14,7 +14,8 @@
     "start:node": "node src/index.js",
     "dev": "NODE_ENV=development bun --watch src/index.js",
     "test": "node --test tests/*.test.js",
-    "check": "node --check src/index.js && node --check src/ws.js && node --check src/auth.js && node --check src/sanitize.js"
+    "check": "node --check src/index.js && node --check src/ws.js && node --check src/auth.js && node --check src/sanitize.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "cheerio": "^1.0.0",
@@ -23,7 +24,9 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "better-sqlite3": "^11.10.0"
+    "@types/node": "^26.6.5",
+    "better-sqlite3": "^11.10.0",
+    "typescript": "^7.0.2"
   },
   "allowScripts": {
     "better-sqlite3@11.10.0": true

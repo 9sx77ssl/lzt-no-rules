@@ -52,7 +52,7 @@ const config = {
   publicUrl: process.env.PUBLIC_URL || 'wss://lztws.d9v.uk/ws',
   tlsKeyPath: process.env.TLS_KEY_PATH || '',
   tlsCertPath: process.env.TLS_CERT_PATH || '',
-  version: process.env.SERVER_VERSION || '1.2.5',
+  version: process.env.SERVER_VERSION || '1.2.6',
   roomTitle: process.env.ROOM_TITLE || 'No Rules',
 
   dbPath: process.env.DB_PATH || fileURLToPath(new URL('../data/no-rules.db', import.meta.url)),
@@ -115,6 +115,10 @@ const config = {
     delete: {
       capacity: int(process.env.RATE_DELETE_BURST, 6),
       refillPerSec: perSecond(process.env.RATE_DELETE_REFILL, 2),
+    },
+    report: {
+      capacity: int(process.env.RATE_REPORT_BURST, 5),
+      refillPerSec: perSecond(process.env.RATE_REPORT_REFILL, 10),
     },
   },
 
