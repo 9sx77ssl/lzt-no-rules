@@ -1091,6 +1091,37 @@ function createMentionNode(user) {
   return anchor;
 }
 
+async function hydrateMentionAnchor(anchor, { requireConnected = true } = {}) {
+  if (!anchor || (requireConnected && !anchor.isConnected)) return false;
+  if (anchor.dataset.nrHydrated === '1' || anchor.dataset.nrHydrated === 'pending') return false;
+  const avatar = anchor.querySelector('img.avatar');
+  if (avatar && avatar.src && avatar.src !== DEFAULT_AVATAR_URL) {
+    anchor.dataset.nrHydrated = '1';
+    return false;
+  }
+  const [rawId, ...nameParts] = String(anchor.dataset.user || '').split(',');
+  const id = Number(rawId) || 0;
+  const name = nameParts.join(',').trim();
+  if (!id || !name) return false;
+  anchor.dataset.nrHydrated = 'pending';
+  const user = await findForumUser(name);
+  if (!user || (requireConnected && !anchor.isConnected)) {
+    anchor.dataset.nrHydrated = user ? '1' : 'failed';
+    return false;
+  }
+  const replacement = createMentionNode({ ...user, id });
+  replacement.dataset.nrHydrated = '1';
+  anchor.replaceWith(replacement);
+  return true;
+}
+
+async function hydrateMentionNodes(root, options = {}) {
+  if (!root) return;
+  const anchors = [...root.querySelectorAll('a.mention[data-user]')];
+  if (!anchors.length) return;
+  await Promise.all(anchors.map((anchor) => hydrateMentionAnchor(anchor, options)));
+}
+
 async function resolvePlainMentions(html) {
   const template = document.createElement('template');
   template.innerHTML = String(html || '');
@@ -1154,17 +1185,7 @@ async function resolvePlainMentions(html) {
 
   // [USER=id] already has a basic mention; fill in the real avatar/name style
   // from the forum when the nickname resolves. Failures keep the basic block.
-  await Promise.all(
-    mentionNodes.map(async (anchor) => {
-      const [rawId, ...nameParts] = String(anchor.dataset.user || '').split(',');
-      const id = Number(rawId) || 0;
-      const name = nameParts.join(',').trim();
-      if (!id || !name) return;
-      const user = await findForumUser(name);
-      if (!user) return;
-      anchor.replaceWith(createMentionNode({ ...user, id }));
-    }),
-  );
+  await Promise.all(mentionNodes.map((anchor) => hydrateMentionAnchor(anchor, { requireConnected: false })));
   return template.innerHTML;
 }
 

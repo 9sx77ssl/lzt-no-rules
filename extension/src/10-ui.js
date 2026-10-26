@@ -1780,6 +1780,7 @@ function createMessageElement(message, { showHeader = true } = {}) {
       prepareLightboxImages(text);
       applySingleSmilie(text);
       prepareReplyVideos(text);
+      hydrateMentionNodes(text, { requireConnected: false });
     } else {
       const paragraph = document.createElement('p');
       paragraph.textContent = message.reply.text || '[сообщение]';
@@ -1809,6 +1810,7 @@ function createMessageElement(message, { showHeader = true } = {}) {
       hydrateMarketCards(inner);
       prepareLightboxImages(inner);
       applySingleSmilie(inner);
+      hydrateMentionNodes(inner, { requireConnected: false });
     } else {
       inner.textContent = message.text || '';
     }

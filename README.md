@@ -8,7 +8,7 @@ Tiptap, reply/edit-бары, контекстное меню и мобильны
 - Репозиторий: <https://github.com/9sx77ssl/lzt-no-rules>
 - WSS: `wss://lztws.d9v.uk/ws`
 - Health: <https://lztws.d9v.uk/health> · Version: <https://lztws.d9v.uk/version>
-- Версия: **1.1.28**
+- Версия: **1.1.29**
 
 > Это не E2E. Сообщения хранятся в SQLite у владельца сервера. Пароль,
 > cookies форума и платёжные данные на backend не отправляются.
@@ -104,7 +104,7 @@ bun run start
 ## Сборка и релиз
 
 ```bash
-NR_VERSION=1.1.28 \
+NR_VERSION=1.1.29 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
