@@ -129,6 +129,11 @@ BBCode (`[UNFURL]`, `[IMG]`, `[MEDIA]`, `[URL]`, `[B]`, ...) разбирает�
   смонтированных `<video>`; нативный плеер живёт в `.aspect.lztng-tn70wf`.
 - `renderMessages` переиспользует DOM сообщений по `messageRenderKey`, чтобы
   видео не перезагружалось и не появлялся спиннер при новых сообщениях.
+- `normalizeClientHtml` удаляет Tiptap-хвосты (`ProseMirror-widget`,
+  лишний `<br>`, пустой `<p>`), из-за которых карточка растягивала
+  сообщение на вторую строку.
+- `normalizeUnfurlCards` превращает Tiptap `market_search` в legacy
+  `.unfurlContainer.marketItem` высотой 24 px, как в нативном Chatbox.
 - В редакторе видео muted autoplay; в reply-баре — HTML5 controls.
 
 ## 6. Typing
@@ -164,6 +169,11 @@ No Rules; нативная комната не затрагивается.
   очередь автоматически;
 - история грузится по 60/50; после reconnect догоняется через `after`,
   включая `after=0` для пустой комнаты; позиция скролла сохраняется.
+- Индикатор `#no-rules-socket` использует нативный `chat2-socket-state`;
+  клик открывает `Отладка сокета` с WebSocket/auth/history/outbox/pong.
+- При выходе из комнаты удаляется только UI No Rules и очищаются typing
+  timers; WebSocket/сессия остаются, а `ensureRoomLink` возвращает пункт
+  меню после перерисовки нативной комнаты.
 
 ## 9. Тесты
 

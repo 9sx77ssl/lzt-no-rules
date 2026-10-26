@@ -206,6 +206,10 @@ DELETE FROM messages WHERE client_id LIKE 'seed-history-%';
 - [ ] Firefox: комната, отправка, нативное переключение.
 - [ ] Прямой `#no-rules`, reload, reconnect, offline outbox.
 - [ ] История > 60, позиция скролла, отсутствие дублей.
+- [ ] Market-карточка 24 px, без лишнего `<br>`/`ProseMirror-widget`.
+- [ ] BBCode: quote/spoiler/list/center/color/size + F5.
+- [ ] Клик по socket-индикатору открывает native debug-модалку.
+- [ ] Native room → No Rules: пункт меню возвращается, скролл сохраняется.
 - [ ] `https://lztws.d9v.uk/health` и `/version`.
 - [ ] Нет секретов в `git status`/`git diff`.
 - [ ] Raw userscript на GitHub совпадает по SHA-256 с локальным.

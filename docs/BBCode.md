@@ -1,146 +1,82 @@
 # BBCode
 
-No Rules принимает форумный BBCode двумя путями:
+BBCode разбирается дважды:
 
-1. **Перед отправкой** — `resolveBbcode(getEditorHtml())` в
-   `sendCurrentMessage`/`saveEdit`.
-2. **При рендере** — `enhanceUnfurls()` вызывает `resolveBbcode` для старых
-   сообщений, которые уже лежат в БД как текст.
-
-Поэтому BBCode из буфера обмена не нужно вставлять вручную в HTML.
-
-## Поддерживаемые теги
-
-| BBCode | Результат |
-|---|---|
-| `[B]текст[/B]` | `<strong>текст</strong>` |
-| `[I]текст[/I]` | `<em>текст</em>` |
-| `[U]текст[/U]` | `<u>текст</u>` |
-| `[S]текст[/S]` | `<s>текст</s>` |
-| `[CODE]текст[/CODE]` | `<code>текст</code>` |
-| `[QUOTE]текст[/QUOTE]` | `<blockquote>текст</blockquote>` |
-| `[URL=https://...]текст[/URL]` | ссылка |
-| `[IMG]https://...[/IMG]` | `a.LbTrigger > img.bbCodeImage.LbImage` |
-| `[MEDIA=youtube]https://...[/MEDIA]` | `.embed-link` карточка |
-| `[VIDEO]https://...[/VIDEO]` | `<video controls>` |
-| `[UNFURL="https://..."]https://...[/UNFURL]` | market/forum unfurl |
-| `[USER=123]@nick[/USER]` | mention-блок |
+1. перед отправкой — `resolveBbcode(normalizeClientHtml(getEditorHtml()))`;
+2. при рендере — `enhanceUnfurls()` для старых сообщений и после F5.
 
 Теги регистронезависимы. Неизвестные теги остаются текстом.
 
-## Примеры
+## Что поддерживается
 
-### Аккаунт
+| BBCode | Результат |
+|---|---|
+| `[B]`, `[I]`, `[U]`, `[S]` | нативное форматирование |
+| `[COLOR=red]`, `[COLOR=#ff0000]` | цвет |
+| `[SIZE=1..7]`, `[SIZE=+1]` | размер XenForo: 9–26 px |
+| `[URL]`, `[URL=...]`, `[EMAIL]`, `[EMAIL=...]` | ссылка / `mailto:` |
+| `[USER=id]ник[/USER]` | mention-блок |
+| `[IMG]...[/IMG]` | `a.LbTrigger > img.bbCodeImage.LbImage` |
+| `[MEDIA=youtube|soundcloud]...[/MEDIA]` | `.embed-link` карточка |
+| `[VIDEO]...[/VIDEO]` | HTML5 video |
+| `[UNFURL="url"]url[/UNFURL]` | market/forum unfurl |
+| `[LIST]` / `[LIST=1]` + `[*]` | `ul` / `ol` |
+| `[LEFT]`, `[CENTER]`, `[RIGHT]` | `div.content--align--*` |
+| `[QUOTE]`, `[QUOTE=author]` | `div.bbCodeBlock.bbCodeQuote` |
+| `[SPOILER]`, `[SPOILER=title]` | нативная кнопка + `.SpoilerTarget` |
+| `[CODE]`, `[PHP]`, `[HTML]`, `[SRC]` | `pre > code` |
+| `[PLAIN]` | текст без разбора BBCode |
+| `[PRICE]`, `[PRICE=USD]` | `.bbCodePrice` |
+| `[BUTTON=url]текст[/BUTTON]` | `a.button.primary` |
+| `[HR]` | горизонтальная линия |
 
-```bbcode
-[UNFURL="https://lzt.market/266223421/"]https://lzt.market/266223421/[/UNFURL]
-```
+Вложенные одинаковые теги, `br` внутри блоков, кавычки и атрибуты без
+кавычек поддерживаются. Списки и блоки, набранные через переносы строк,
+разбираются как один текстовый блок.
 
-Становится legacy-карточкой:
+## Почему не оригинальный JS-парсер
 
-```html
-<div class="unfurlContainer shorted marketItem category--steam">
-  <div class="text">
-    <span class="SvgIcon">
-      <span class="categoryIcon steam Tooltip" data-cachedtitle="Steam"></span>
-    </span>
-    <span class="title">Steam • ...</span>
-    <div class="price">
-      <span class="Value" data-value="7932">7 932 ₽</span>
-    </div>
-  </div>
-  <a class="LinkClicker" href="https://lzt.market/266223421/"></a>
-</div>
-```
+В сохранённых чанках `chat2.js`, `xenforo-*.js` и `tiptap-vendor-*.js` нет
+клиентского XenForo BBCode-парсера: форум рендерит BBCode на PHP и отдаёт
+уже готовый HTML. Публичного `/editor/convert` нет — проверка дала 404.
+Поэтому здесь повторён формат HTML, который отдаёт форум, а не подключён
+несуществующий клиентский парсер. `[CLUB]`, `[DAYS]`, `[LIKES]` и подобные
+теги всё равно нельзя честно вычислить без серверных прав.
 
-Перед сборкой карточки клиент запрашивает
-`POST https://api.lolz.team/editor/unfurl` с Bearer-токеном `basic post`,
-поэтому цена/категория/название берутся с форума, а не выдумываются.
+## Где parser не равен PHP-парсеру форума
 
-### Фото
+XenForo рендерит BBCode на сервере. Клиентский userscript не может честно
+повторить теги, которые зависят от прав пользователя:
 
-```bbcode
-[img]https://nztcdn.com/files/....webp[/img]
-```
+`[CLUB]`, `[DAYS]`, `[EXCEPTIDS]`, `[LANG]`, `[LIKES]`, `[LIKES2]`,
+`[USERIDS]`, `[API]`.
 
-Становится:
+Они остаются текстом, а не раскрывают скрытый контент и не делают запросы
+от имени пользователя. `[CENSOR]` отображается как `div.CensorSpoiler`.
 
-```html
-<a class="LbTrigger" href="..." data-href="https://lolz.team/misc/lightbox"
-   data-fancybox="gallery">
-  <img class="bbCodeImage LbImage" src="..." alt="[IMG]" loading="lazy">
-</a>
-```
+## Нативные карточки
 
-Клик открывает нативный fancybox, а не новую вкладку.
+- Market/раздел: `.unfurlContainer.shorted.marketItem` с `categoryIcon`,
+  `.title`, `.price` и `.LinkClicker`; высота 24 px, как в живом Chatbox.
+- Tiptap-карточка `market_search` при рендере приводится к этой же
+  legacy-карточке.
+- Форумный раздел: `.unfurl-renderer` + `.forum-wrapper`; заголовок
+  подтягивается через `/forums/<slug>/`.
+- Медиа: `.embed-link`; market/account metadata — через
+  `POST https://api.lolz.team/editor/unfurl` с `basic post`-токеном.
 
-### YouTube
+## Copy
 
-```bbcode
-[MEDIA=youtube]https://www.youtube.com/watch?v=az7_Zxmdgd0[/MEDIA]
-```
-
-Становится `.embed-link[data-site-id=youtube]` с подписью «Видео на Youtube».
-
-### Ссылка
-
-```bbcode
-[URL=https://lolz.team/forums/contests]Розыгрыши[/URL]
-```
-
-Если у ссылки есть кастомный текст, auto-unfurl её **не** заменяет на
-карточку; она остаётся обычной ссылкой.
-
-### Упоминание
-
-```bbcode
-[USER=9252369]@yolo[/USER]
-```
-
-Создаёт `a.username.mention[data-user="9252369, yolo"]` с
-`span.styleUserNickname`. Нативный аватар/иконка не подтягиваются, потому
-что BBCode-тег не содержит rendered HTML; можно отдельно вызвать
-`/members/find`.
-
-## Копирование
-
-`htmlToBbcode` при копировании сообщения:
+`htmlToBbcode()` сохраняет:
 
 | DOM | BBCode |
 |---|---|
-| `.unfurlContainer.marketItem` | `[UNFURL="href"]href[/UNFURL]` |
-| `.unfurl-renderer .forum-wrapper` | `[UNFURL="href"]href[/UNFURL]` |
+| market/account card | `[UNFURL="href"]href[/UNFURL]` |
 | `.embed-link` | `[MEDIA=site]url[/MEDIA]` |
 | `a.LbTrigger img` | `[IMG]src[/IMG]` |
 | `a.mention` | `[USER=id]@nick[/USER]` |
-| `<a href>text</a>` | `[URL=href]text[/URL]` |
-| `<b>/<i>/<u>/<s>` | `[B]/[I]/[U]/[S]` |
-| `video[src]` | `[VIDEO]src[/VIDEO]` |
+| `a.button.primary` | `[BUTTON=href]text[/BUTTON]` |
+| `[B]/[I]/[U]/[S]`, quote, spoiler, list, color/size | исходные теги |
 
 Копирование использует `message.raw`, если он есть, иначе —
-`htmlToBbcode(message.html)`. Никаких toast-уведомлений.
-
-## Ограничения
-
-- Парсер рассчитан на плоские/умеренно вложенные BBCode-теги; он не является
-  полным XenForo BBCode-парсером.
-- `[QUOTE]` не сохраняет автора/ссылку на оригинал.
-- Неизвестные атрибуты тегов отбрасываются.
-- Внутри `<code>`/`<pre>` BBCode не парсится.
-- Ссылки в `[URL]` проходят через клиентский/серверный allowlist URL.
-- Если `/editor/unfurl` недоступен, `[UNFURL]` остаётся кликабельной ссылкой,
-  а не ломает отправку.
-- Для аккаунтов без цены (`extra.price` нет) блок показывается без плашки
-  цены.
-
-## Проверка
-
-```js
-// после отправки BBCode
-document.querySelector('#no-rules-messages .unfurlContainer.marketItem .price')
-document.querySelector('#no-rules-messages a.LbTrigger img')
-document.querySelector('#no-rules-messages .embed-link[data-site-id="youtube"]')
-```
-
-Скопировать текст: правый клик → «Скопировать текст»; ожидается исходный
-BBCode, например `[IMG]...[/IMG]` или `[UNFURL="..."]...[/UNFURL]`.
+`htmlToBbcode(message.html)`. Тостов нет.

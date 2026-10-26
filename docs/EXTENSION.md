@@ -263,10 +263,37 @@ document-start
 
 `resolveBbcode`:
 
-- парсит текст в Tiptap HTML;
-- `[IMG]`, `[MEDIA]`, `[UNFURL]`, `[URL]`, `[B/I/U/S]`, `[CODE]`,
-  `[QUOTE]`, `[VIDEO]`, `[USER]`;
+- парсит plain-text блоки Tiptap целиком, включая переносы `<br>`;
+- поддерживает `[B/I/U/S]`, `[COLOR]`, `[SIZE]`, `[URL]`, `[EMAIL]`,
+  `[IMG]`, `[MEDIA]`, `[VIDEO]`, `[UNFURL]`, `[USER]`, `[LIST]`+`[*]`,
+  `[LEFT/CENTER/RIGHT]`, `[QUOTE=author]`, `[SPOILER=title]`,
+  `[CODE/PHP/HTML/SRC]`, `[PLAIN]`, `[PRICE]`, `[BUTTON]`, `[HR]`;
+- одинаковые вложенные теги закрываются по балансу, а не по первому
+  `[/tag]`;
 - вызывается при отправке и при рендере старых сообщений.
+
+`normalizeClientHtml` убирает Tiptap-хвосты (`ProseMirror-widget`, лишний
+`<br>`, пустой `<p>`) до санитайзера. Без этого карточка получала лишнюю
+строку и сообщение становилось вдвое выше.
+
+`normalizeUnfurlCards` приводит `market_search`-ноды Tiptap к нативной
+legacy-карточке `.unfurlContainer.shorted.marketItem` (24 px), а не оставляет
+высокий inline-block `.unfurl-renderer`.
+
+## 11.1. Индикатор сокета и переключение комнат
+
+`ensureSocketIndicator()` создаёт `#no-rules-socket` в `.room-title` с нативным
+`chat2-socket-state`/`socket-connected`. Клик или Enter открывает модалку
+`Отладка сокета` с проверками WebSocket, auth, history, outbox, pong и
+reconnect. Нативный socket скрывается только на время активной комнаты.
+
+При выходе из No Rules:
+- сохраняются `roomScrollTop`/`roomAtBottom`;
+- очищаются typing timers, reply/edit, меню и online-модалка;
+- удаляется `#no-rules-messages`, нативные сообщения и socket возвращаются;
+- WebSocket/сессия не теряются, поэтому возврат в комнату быстрый;
+- `ensureRoomLink` повторно добавляет пункт бокового меню после Svelte
+  перерисовки нативной комнаты.
 
 ## 12. Копирование
 
