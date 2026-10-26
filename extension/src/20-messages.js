@@ -592,22 +592,6 @@ function deleteMessage(message) {
   }
 }
 
-function retryPending(clientId) {
-  const pending = state.pending.get(clientId);
-  if (!pending) return;
-  pending.failed = false;
-  pending.createdAt = now();
-  pending.queued = false;
-  state.pending.set(clientId, pending);
-  renderMessages({ forceBottom: true });
-  const sent = sendWs(pending.payload);
-  if (!sent) {
-    pending.queued = true;
-    queueOutbox(pending.payload);
-    showToast('Сообщение будет отправлено после подключения.', 'info');
-  }
-}
-
 function removePending(clientId) {
   if (!clientId) return;
   const timer = state.pendingCommitTimers.get(clientId);
@@ -888,6 +872,7 @@ function applyHistoryPage(payload) {
       : null;
     state.oldestId = state.historyWindow?.min ?? null;
     state.jumpTargetId = Number(payload.near) || null;
+    state.historyNewerReadyAt = now() + 1200;
     if (state.active) {
       renderMessages({ preserveScroll: true, forceBottom: false });
       requestAnimationFrame(() => {

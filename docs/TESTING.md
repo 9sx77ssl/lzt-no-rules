@@ -15,7 +15,7 @@ sanitize. Playwright-сценарии лежат вне репозитория �
 ## 2. Сборка
 
 ```bash
-NR_VERSION=1.2.0 \
+NR_VERSION=1.2.1 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -245,7 +245,12 @@ DELETE FROM messages WHERE client_id LIKE 'seed-history-%';
 - [ ] `https://lzt.market/266223421/` → account block with icon/title/price.
 - [ ] `[UNFURL="..."]...[/UNFURL]` → same block.
 - [ ] `[MEDIA=youtube]...[/MEDIA]` → correct embed (not malformed link).
-- [ ] `[URL]`, `[IMG]`, `[MEDIA]`, `[UNFURL]`, `[USER]` render; `[B]/[COLOR]/[QUOTE]` остаются текстом как набраны.
+- [ ] `[URL]`, `[IMG]`, `[IMG=width=...;height=...]`, `[MEDIA]`, `[UNFURL]`, `[USER]` render; `[B]/[COLOR]/[QUOTE]` остаются текстом как набраны.
+- [ ] Перетаскивание уже отправленной фотографии в редактор отправляет её повторно.
+- [ ] Pending: серые часы без времени; через ~1 с реальное сообщение с временем.
+- [ ] Ошибка отправки: bubble плавно исчезает, красной обводки/«Повторить» нет, нативный `.chat2-error` живёт 3 с.
+- [ ] Пустой Enter → «Пожалуйста, введите корректное сообщение.»
+- [ ] Переход к reply: нативная `.message-highlight`, без зелёной обводки; старое сообщение грузится окном `history near`.
 
 ### Safety / polish
 

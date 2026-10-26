@@ -280,6 +280,10 @@ function onDocumentClickCapture(event) {
   if (target.closest('#no-rules-paused')) {
     event.preventDefault();
     event.stopPropagation();
+    if (state.viewingHistory) {
+      returnToLatest();
+      return;
+    }
     state.unread = 0;
     updateUnreadBadge();
     updatePaused();

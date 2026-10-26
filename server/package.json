@@ -1,12 +1,12 @@
 {
   "name": "no-rules-chat-server",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "description": "WebSocket/HTTP backend for the No Rules Chatbox room",
   "main": "src/index.js",
   "engines": {
-    "bun": ">=1.2.0",
+    "bun": ">=1.2.1",
     "node": ">=20.11"
   },
   "scripts": {

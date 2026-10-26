@@ -1,6 +1,6 @@
 # Протокол No Rules
 
-Версия протокола: **1** (клиент 1.2.0, сервер 1.2.0). Транспорт — WebSocket, текстовые кадры JSON.
+Версия протокола: **1** (клиент 1.2.1, сервер 1.2.1). Транспорт — WebSocket, текстовые кадры JSON.
 Сервер: `wss://lztws.d9v.uk/ws`.
 
 ## 1. Подключение
@@ -8,7 +8,7 @@
 1. Клиент открывает WebSocket.
 2. Сервер присылает `hello`:
    ```json
-   {"type":"hello","protocol":1,"version":"1.2.0","roomTitle":"No Rules","serverTime":1792946496011}
+   {"type":"hello","protocol":1,"version":"1.2.1","roomTitle":"No Rules","serverTime":1792946496011}
    ```
 3. Клиент отправляет `auth` (первый вход) или `resume` (есть сессия).
 
@@ -19,7 +19,7 @@
   "type": "auth",
   "token": "<временный токен форума>",
   "accessKey": "<общий ключ расширения>",
-  "clientVersion": "1.2.0"
+  "clientVersion": "1.2.1"
 }
 ```
 
@@ -46,7 +46,7 @@
 ### resume
 
 ```json
-{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.2.0"}
+{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.2.1"}
 ```
 
 Ответ такой же `auth.ok`; поле `resumed` есть только в логах сервера.
@@ -72,6 +72,7 @@
 {"type":"history","before":123,"limit":50}
 {"type":"history","after":456,"limit":100}
 {"type":"history","after":0,"limit":100}
+{"type":"history","near":123,"limit":60}
 ```
 
 Ответ:
@@ -81,18 +82,24 @@
   "type": "history",
   "messages": [/* message */],
   "hasMore": true,
+  "hasMoreBefore": null,
+  "hasMoreAfter": null,
   "before": null,
   "after": null,
+  "near": null,
   "limit": 60,
   "requestId": null,
   "serverTime": 1792946496011
 }
 ```
 
-- Без `before`/`after` — последние `limit` сообщений.
+- Без `before`/`after`/`near` — последние `limit` сообщений.
 - `before` — более старые, `after` — более новые (для догона после
   переподключения). `after=0` означает начало сохранённого потока и нужен,
   когда комната была пустой (`lastMessageId === 0`).
+- `near` — компактное окно вокруг сообщения для перехода из reply: примерно
+  половина страницы до и после цели. `hasMoreBefore`/`hasMoreAfter` говорят,
+  можно ли догружать старше/новее.
 - `limit` ограничен `MAX_HISTORY_PAGE_SIZE` (по умолчанию 100). Клиент
   грузит по 60 при старте и по 50 при скролле вверх.
 
