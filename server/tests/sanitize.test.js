@@ -101,3 +101,14 @@ test('keeps rendered BBCode blocks, styles and spoiler controls', () => {
   assert.match(result.html, /font-size:26px/);
   assert.match(result.html, /<ul><li>one<\/li><\/ul>/);
 });
+
+
+test('keeps dragged image inside href-less editor anchor and clamps dimensions', () => {
+  const sanitizer = createSanitizer({ allowExternalImages: false });
+  const result = sanitizer.sanitizeMessage(
+    '<p><a target="_blank"><img src="https://nztcdn.com/files/a.webp" width="99999" height="40"></a></p>',
+  );
+  assert.match(result.html, /<img[^>]+width="5000"/);
+  assert.match(result.html, /<img[^>]+height="40"/);
+  assert.equal(result.meta.images, 1);
+});

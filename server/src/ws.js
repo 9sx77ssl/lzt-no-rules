@@ -388,22 +388,27 @@ export function createWsServer({ server, config, db, auth, sanitizer, logger }) 
         : Number(data.after) === 0
           ? 0
           : safeInteger(data.after);
+    const near = data.near == null ? null : safeInteger(data.near);
     if (data.before != null && before == null) throw new ClientError('bad_request', 'Некорректный before');
     if (data.after != null && after == null) throw new ClientError('bad_request', 'Некорректный after');
-    if (before != null && after != null) {
-      throw new ClientError('bad_request', 'Нельзя одновременно before и after');
+    if (data.near != null && near == null) throw new ClientError('bad_request', 'Некорректный near');
+    if ([before, after, near].filter((value) => value != null).length > 1) {
+      throw new ClientError('bad_request', 'Нельзя одновременно before, after и near');
     }
     const limit = Math.max(
       1,
       Math.min(Number(data.limit) || config.historyPageSize, config.maxHistoryPageSize),
     );
-    const result = db.getHistory({ before, after, limit });
+    const result = db.getHistory({ before, after, near, limit });
     send(ws, {
       type: ServerType.HISTORY,
       messages: result.messages,
       hasMore: result.hasMore,
+      hasMoreBefore: result.hasMoreBefore ?? null,
+      hasMoreAfter: result.hasMoreAfter ?? null,
       before,
       after,
+      near,
       limit,
       requestId: typeof data.requestId === 'string' ? data.requestId.slice(0, 64) : null,
       serverTime: Date.now(),

@@ -378,8 +378,29 @@ export function openDatabase({ path, logger }) {
     return row ? rowToMessage(row) : null;
   }
 
-  function getHistory({ before = null, after = null, limit = 50 } = {}) {
+  function getHistory({ before = null, after = null, near = null, limit = 50 } = {}) {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
+    if (near != null) {
+      // Native chatbox jump-to-message loads a compact window around the
+      // target instead of replaying the entire room. Keep the same shape:
+      // half a page before, the target, half a page after.
+      const side = Math.max(1, Math.floor((safeLimit - 1) / 2));
+      const beforeRows = stmts.messagesBefore.all(Number(near), side + 1);
+      const afterRows = stmts.messagesAfter.all(Number(near), side + 1);
+      const target = stmts.getMessageById.get(Number(near));
+      const page = [
+        ...beforeRows.slice(0, side).reverse(),
+        ...(target ? [target] : []),
+        ...afterRows.slice(0, side),
+      ];
+      return {
+        messages: page.map(rowToMessage),
+        hasMore: beforeRows.length > side,
+        hasMoreBefore: beforeRows.length > side,
+        hasMoreAfter: afterRows.length > side,
+        near: Number(near),
+      };
+    }
     let rows;
     if (after != null) {
       rows = stmts.messagesAfter.all(Number(after), safeLimit + 1);
@@ -394,6 +415,8 @@ export function openDatabase({ path, logger }) {
     return {
       messages: page.map(rowToMessage),
       hasMore,
+      hasMoreBefore: before != null ? hasMore : null,
+      hasMoreAfter: after != null ? hasMore : null,
     };
   }
 

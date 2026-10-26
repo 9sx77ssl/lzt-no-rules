@@ -8,7 +8,7 @@ Tiptap, reply/edit-бары, контекстное меню и мобильны
 - Репозиторий: <https://github.com/9sx77ssl/lzt-no-rules>
 - WSS: `wss://lztws.d9v.uk/ws`
 - Health: <https://lztws.d9v.uk/health> · Version: <https://lztws.d9v.uk/version>
-- Версия: **1.1.29**
+- Версия: **1.2.0**
 
 > Это не E2E. Сообщения хранятся в SQLite у владельца сервера. Пароль,
 > cookies форума и платёжные данные на backend не отправляются.
@@ -20,7 +20,8 @@ Tiptap, reply/edit-бары, контекстное меню и мобильны
   одинаковые сообщения подряд.
 - Нативные карточки: market-разделы 24 px, форумные/медиа/аккаунты, фото
   через fancybox, XenForo-плеер, смайлы 96×96.
-- BBCode: URL, IMG, MEDIA, VIDEO, UNFURL и USER. Все остальные теги остаются обычным текстом как есть, вместе со скобками.
+- BBCode: URL, IMG (включая `[IMG=width=...;height=...]`), MEDIA, VIDEO, UNFURL и USER. Все остальные теги остаются обычным текстом как есть, вместе со скобками.
+- Pending-сообщения и ошибки отправки ведут себя как в нативном Chatbox; переход к reply грузит компактное окно истории.
 - История, unread, typing, онлайн, мобильный вид и сохранение скролла при
   переключении комнат.
 - Outbox переживает обрыв и F5; `clientId` не даёт создать дубль; после
@@ -104,7 +105,7 @@ bun run start
 ## Сборка и релиз
 
 ```bash
-NR_VERSION=1.1.29 \
+NR_VERSION=1.2.0 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs

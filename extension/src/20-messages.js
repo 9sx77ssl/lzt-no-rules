@@ -1,5 +1,6 @@
 /* Message rendering and message actions: grouping, optimistic sends,
  * history paging, replies, edits, deletes and the native typing indicator. */
+const PENDING_MIN_VISIBLE_MS = 900;
 function findMessage(id) {
   const numeric = Number(id);
   if (!Number.isFinite(numeric)) return null;
@@ -141,6 +142,7 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
   updatePaused();
   updateUnreadBadge();
   updateConnectionError();
+  updateComposerError();
 }
 
 function renderTypingInto(container) {
@@ -273,8 +275,8 @@ function handleIncomingMessage(payload) {
   const id = Number(message.id);
   const clientId = payload.clientId || message.clientId || null;
   const isAck = Boolean(payload.ack);
+  const pending = clientId ? state.pending.get(clientId) : null;
 
-  if (clientId) removePending(clientId);
   removeTyping(message.user.id);
 
   const existing = state.messages.get(id);
@@ -286,6 +288,28 @@ function handleIncomingMessage(payload) {
     state.messages.set(id, message);
   }
   updateLastMessageId([message]);
+
+  if (pending) {
+    // The native chatbox keeps the clock visible until the request finishes.
+    // Server acks are usually much faster than a human can see, so keep the
+    // optimistic bubble for a short minimum and then swap in the real message.
+    const wait = Math.max(0, PENDING_MIN_VISIBLE_MS - (now() - Number(pending.createdAt || 0)));
+    state.outbox = state.outbox.filter((item) => item.clientId !== clientId);
+    saveOutbox();
+    if (wait > 0) {
+      message.deferredClientId = clientId;
+      if (state.pendingCommitTimers.has(clientId)) {
+        clearTimeout(state.pendingCommitTimers.get(clientId));
+      }
+      const timer = setTimeout(() => {
+        state.pendingCommitTimers.delete(clientId);
+        removePending(clientId);
+      }, wait);
+      state.pendingCommitTimers.set(clientId, timer);
+    } else {
+      removePending(clientId);
+    }
+  }
 
   const own = message.user.id === state.user?.id;
   const wasNearBottom = isNearBottom();
@@ -487,7 +511,7 @@ function renderEditBar() {
 async function saveEdit() {
   if (!state.editing) return;
   if (editorIsEmpty()) {
-    showToast('Сообщение пустое', 'error');
+    showComposerError('Пожалуйста, введите корректное сообщение.');
     return;
   }
   const id = state.editing.id;
@@ -586,11 +610,46 @@ function retryPending(clientId) {
 
 function removePending(clientId) {
   if (!clientId) return;
+  const timer = state.pendingCommitTimers.get(clientId);
+  if (timer) clearTimeout(timer);
+  state.pendingCommitTimers.delete(clientId);
   const pending = state.pending.get(clientId);
   if (pending) state.pending.delete(clientId);
   state.outbox = state.outbox.filter((payload) => payload.clientId !== clientId);
   saveOutbox();
   if (pending && state.active) {
+    renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
+  }
+}
+
+function failPending(clientId, message) {
+  const pending = state.pending.get(clientId);
+  if (!pending) {
+    showComposerError(message);
+    return;
+  }
+  if (state.pendingCommitTimers.has(clientId)) {
+    clearTimeout(state.pendingCommitTimers.get(clientId));
+    state.pendingCommitTimers.delete(clientId);
+  }
+  const wrapper = [...document.querySelectorAll('#no-rules-messages [data-nr-message]')]
+    .find((element) => String(element.dataset.messageId) === String(pending.id));
+  if (pending.html && editorIsEmpty()) {
+    setEditorHtml(pending.html);
+  }
+  state.pending.delete(clientId);
+  state.outbox = state.outbox.filter((item) => item.clientId !== clientId);
+  saveOutbox();
+  if (wrapper) wrapper.classList.add('nr-message-failed-out');
+  showComposerError(message);
+  if (wrapper) {
+    setTimeout(() => {
+      wrapper.remove();
+      if (state.active) {
+        renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
+      }
+    }, 220);
+  } else if (state.active) {
     renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
   }
 }
@@ -601,6 +660,10 @@ function resetMessageCache() {
   state.pendingEdits.clear();
   state.historyLoaded = false;
   state.historyHasMore = false;
+  state.historyHasNewer = false;
+  state.historyWindow = null;
+  state.viewingHistory = false;
+  state.jumpTargetId = null;
   state.historyLoading = false;
   state.syncPages = 0;
   state.lastMessageId = 0;
@@ -627,9 +690,12 @@ async function sendCurrentMessage() {
   if (state.editing) {
     return saveEdit();
   }
-  if (editorIsEmpty()) return;
+  if (editorIsEmpty()) {
+    showComposerError('Пожалуйста, введите корректное сообщение.');
+    return;
+  }
   if (!state.user || state.authFailedPermanently) {
-    showToast('Подключение ещё не завершено. Подождите немного.', 'error');
+    showComposerError('Подключение ещё не завершено. Подождите немного.');
     return;
   }
   const rawHtml = resolveBbcode(normalizeClientHtml(getEditorHtml()));
@@ -646,7 +712,7 @@ async function sendCurrentMessage() {
     // keep already resolved unfurls
   }
   if (html.length > 24_000) {
-    showToast('Сообщение слишком длинное', 'error');
+    showComposerError('Сообщение слишком длинное');
     return;
   }
   const clientId = randomId();
@@ -691,7 +757,6 @@ async function sendCurrentMessage() {
   if (!sent) {
     pending.queued = true;
     queueOutbox(payload);
-    showToast('Нет соединения. Сообщение будет отправлено после подключения.', 'info');
   }
 }
 
@@ -713,7 +778,6 @@ function handleServerError(payload) {
   if (code === 'rate_limited') {
     const pending = clientId ? state.pending.get(clientId) : null;
     if (pending) {
-      pending.failed = false;
       pending.queued = true;
       state.pending.set(clientId, pending);
     }
@@ -724,23 +788,17 @@ function handleServerError(payload) {
     return;
   }
 
-  if (clientId && state.pending.has(clientId)) {
-    const pending = state.pending.get(clientId);
-    if (code === 'duplicate') {
-      state.pending.delete(clientId);
-      state.outbox = state.outbox.filter((item) => item.clientId !== clientId);
-      saveOutbox();
-      renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
-      showToast('Такое сообщение уже отправлено', 'info');
-      return;
-    }
-    pending.failed = true;
-    pending.queued = false;
-    state.outbox = state.outbox.filter((item) => item.clientId !== clientId);
+  if (code === 'duplicate' && clientId) {
+    removePending(clientId);
     saveOutbox();
-    state.pending.set(clientId, pending);
-    if (state.active) renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
-    showToast(message, 'error');
+    return;
+  }
+
+  if (clientId && state.pending.has(clientId)) {
+    failPending(
+      clientId,
+      code === 'empty' ? 'Пожалуйста, введите корректное сообщение.' : message,
+    );
     return;
   }
   if (clientId) {
@@ -755,7 +813,7 @@ function handleServerError(payload) {
     }
     if (state.active) renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
   }
-  showToast(message, 'error');
+  showComposerError(message);
 }
 
 function showBrowserNotification(message) {
@@ -802,17 +860,57 @@ function sendTyping() {
 
 function applyHistoryPage(payload) {
   const messages = Array.isArray(payload?.messages) ? payload.messages : [];
-  const mode = payload?.after != null ? 'after' : payload?.before != null ? 'before' : 'initial';
-  mergeHistoryMessages(messages, { mode });
+  const mode =
+    payload?.near != null
+      ? 'near'
+      : payload?.after != null
+        ? 'after'
+        : payload?.before != null
+          ? 'before'
+          : 'initial';
   state.historyLoading = false;
   if (state.historyRetryTimer) {
     clearTimeout(state.historyRetryTimer);
     state.historyRetryTimer = null;
   }
 
+  if (mode === 'near') {
+    state.messages.clear();
+    state.deletedIds.clear();
+    mergeHistoryMessages(messages, { mode: 'near' });
+    state.historyLoaded = true;
+    state.viewingHistory = true;
+    state.historyHasMore = Boolean(payload.hasMoreBefore ?? payload.hasMore);
+    state.historyHasNewer = Boolean(payload.hasMoreAfter);
+    const ids = [...state.messages.keys()];
+    state.historyWindow = ids.length
+      ? { min: Math.min(...ids), max: Math.max(...ids) }
+      : null;
+    state.oldestId = state.historyWindow?.min ?? null;
+    state.jumpTargetId = Number(payload.near) || null;
+    if (state.active) {
+      renderMessages({ preserveScroll: true, forceBottom: false });
+      requestAnimationFrame(() => {
+        const target = document.querySelector(
+          `#no-rules-messages [data-message-id="${state.jumpTargetId}"]`,
+        );
+        if (target) {
+          highlightElement(target);
+          state.jumpTargetId = null;
+        }
+      });
+    }
+    return;
+  }
+
+  mergeHistoryMessages(messages, { mode });
+
   if (mode === 'initial') {
     state.historyLoaded = true;
-    state.historyHasMore = Boolean(payload.hasMore);
+    state.viewingHistory = false;
+    state.historyWindow = null;
+    state.historyHasNewer = false;
+    state.historyHasMore = Boolean(payload.hasMoreBefore ?? payload.hasMore);
     const ids = [...state.messages.keys()];
     if (ids.length) state.oldestId = Math.min(...ids);
     if (state.active) {
@@ -822,9 +920,12 @@ function applyHistoryPage(payload) {
   }
 
   if (mode === 'before') {
-    state.historyHasMore = Boolean(payload.hasMore);
+    state.historyHasMore = Boolean(payload.hasMoreBefore ?? payload.hasMore);
     const ids = [...state.messages.keys()];
     if (ids.length) state.oldestId = Math.min(...ids);
+    if (state.viewingHistory && state.historyWindow && ids.length) {
+      state.historyWindow.min = Math.min(state.historyWindow.min, Math.min(...ids));
+    }
     if (state.active) {
       renderMessages({ preserveScroll: true, forceBottom: false });
     }
@@ -833,11 +934,40 @@ function applyHistoryPage(payload) {
 
   const ids = [...state.messages.keys()];
   if (ids.length) state.oldestId = Math.min(...ids);
+  if (state.viewingHistory) {
+    state.historyHasNewer = Boolean(payload.hasMoreAfter ?? payload.hasMore);
+    if (ids.length && state.historyWindow) {
+      state.historyWindow.max = Math.max(state.historyWindow.max, Math.max(...ids));
+    }
+    if (!state.historyHasNewer) {
+      state.viewingHistory = false;
+      state.historyWindow = null;
+    }
+  }
   if (state.active) {
     renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
   }
-  if (payload.hasMore && messages.length && state.syncPages < 50) {
+  if (payload.hasMore && messages.length && state.syncPages < 50 && !state.viewingHistory) {
     state.syncPages += 1;
     requestSyncAfter();
   }
+}
+
+function requestHistoryNear(nearId) {
+  if (!nearId || !state.wsAuthenticated) return false;
+  state.jumpTargetId = Number(nearId);
+  state.historyLoading = true;
+  const sent = sendWs({ type: 'history', near: Number(nearId), limit: 60 });
+  if (!sent) {
+    state.historyLoading = false;
+    state.jumpTargetId = null;
+    showComposerError('Не удалось загрузить историю сообщения');
+  }
+  return sent;
+}
+
+function returnToLatest() {
+  resetMessageCache();
+  requestInitialHistory();
+  if (state.active) renderMessages({ preserveScroll: true, forceBottom: true });
 }

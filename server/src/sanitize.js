@@ -608,25 +608,28 @@ export function createSanitizer(options = {}) {
           }
           return { tagName, attribs: out };
         },
-        img: (tagName, attribs) => ({
-          tagName,
-          attribs: {
-            ...attribs,
-            loading: attribs.loading || 'lazy',
-          },
-        }),
+        img: (tagName, attribs) => {
+          const next = { ...attribs, loading: attribs.loading || 'lazy' };
+          for (const key of ['width', 'height']) {
+            const value = Number(next[key]);
+            if (Number.isInteger(value) && value > 0) {
+              next[key] = String(Math.min(value, 5000));
+            } else {
+              delete next[key];
+            }
+          }
+          return { tagName, attribs: next };
+        },
       },
       exclusiveFilter: (frame) => {
         if (frame.tag === 'img' || frame.tag === 'video' || frame.tag === 'source') {
           return !isAllowedMediaUrl(frame.attribs.src, { allowExternalImages });
         }
-        if (frame.tag === 'a') {
-          const href = frame.attribs.href;
-          if (!href) {
-            const text = frame.text?.trim();
-            return !text;
-          }
-        }
+        // An editor drag can leave an <a> without href around an image. Do
+        // not drop the whole subtree (sanitize-html would lose the image and
+        // make the message look empty); keep the image and let the harmless
+        // anchor remain.
+        if (frame.tag === 'a' && !frame.attribs.href) return false;
         return false;
       },
     });

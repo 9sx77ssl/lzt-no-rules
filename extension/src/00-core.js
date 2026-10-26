@@ -116,6 +116,13 @@ const state = {
   socketDebugTimer: null,
   lastTypingAt: 0,
   connectionError: '',
+  composerError: '',
+  composerErrorTimer: null,
+  pendingCommitTimers: new Map(),
+  viewingHistory: false,
+  historyHasNewer: false,
+  historyWindow: null,
+  jumpTargetId: null,
   authError: '',
   authFailedPermanently: false,
   templates: null,
@@ -720,6 +727,27 @@ function sanitizeUsernameHtml(html) {
 function normalizeClientHtml(html) {
   const template = document.createElement('template');
   template.innerHTML = String(html ?? '');
+
+  // Dragging an already sent photo into Tiptap can wrap the image in an
+  // anchor without href (the editor's link mark is still attached). The
+  // server correctly drops that anchor, but sanitize-html drops its child
+  // image too, so the message becomes empty. Keep the media and unwrap the
+  // editor-only anchor. Same for Tiptap node-view wrappers if a future
+  // editor version serializes them through getHTML().
+  for (const anchor of [...template.content.querySelectorAll('a')]) {
+    if (anchor.getAttribute('href')) continue;
+    if (!anchor.querySelector('img, video')) continue;
+    if ((anchor.textContent || '').trim()) continue;
+    anchor.replaceWith(...anchor.childNodes);
+  }
+  for (const separator of [...template.content.querySelectorAll('.ProseMirror-separator, .ProseMirror-trailingBreak')]) {
+    separator.remove();
+  }
+  for (const wrapper of [...template.content.querySelectorAll('[data-node-view-wrapper], .tiptap-media, .node-image')]) {
+    if (!wrapper.querySelector('img, video')) continue;
+    if ((wrapper.textContent || '').trim()) continue;
+    wrapper.replaceWith(...wrapper.childNodes);
+  }
 
   for (const widget of [...template.content.querySelectorAll('.ProseMirror-widget')]) {
     widget.remove();
@@ -1536,7 +1564,30 @@ function bbcodeCloseIndex(text, tag, from) {
   return -1;
 }
 
-function bbcodeImageElement(url) {
+function bbcodeImageSize(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return {};
+  const result = {};
+  const set = (key, number) => {
+    const parsed = Number(number);
+    if (!Number.isInteger(parsed) || parsed <= 0) return;
+    result[key] = clamp(parsed, 1, 5000);
+  };
+  for (const part of raw.split(';')) {
+    const match = /^\s*(width|height)\s*=\s*(\d{1,6})\s*$/i.exec(part);
+    if (match) set(match[1].toLowerCase(), match[2]);
+  }
+  // XenForo accepts [IMG=80x40] too, although its editor currently drops the
+  // dimensions from that shorthand. Keep it useful for copied messages.
+  const legacy = /^\s*(\d{1,6})\s*[x,]\s*(\d{1,6})\s*$/i.exec(raw);
+  if (legacy && !result.width && !result.height) {
+    set('width', legacy[1]);
+    set('height', legacy[2]);
+  }
+  return result;
+}
+
+function bbcodeImageElement(url, sizeValue = '') {
   const src = String(url || '').trim();
   if (!/^https?:\/\//i.test(src)) return null;
   const link = document.createElement('a');
@@ -1551,6 +1602,9 @@ function bbcodeImageElement(url) {
   image.title = '[IMG]';
   image.loading = 'lazy';
   image.dataset.url = src;
+  const size = bbcodeImageSize(sizeValue);
+  if (size.width) image.setAttribute('width', String(size.width));
+  if (size.height) image.setAttribute('height', String(size.height));
   link.appendChild(image);
   return link;
 }
@@ -1779,7 +1833,7 @@ function bbcodeElement(tag, value, inner) {
       return document.createElement('hr');
     }
     case 'img': {
-      return bbcodeImageElement(inner || value);
+      return bbcodeImageElement(inner || value, value);
     }
     case 'video': {
       const src = String(inner || value || '').trim();
@@ -2188,7 +2242,17 @@ function sortedMessages() {
 }
 
 function allVisibleMessages() {
-  const messages = sortedMessages().filter((message) => !message.deleted);
+  let messages = sortedMessages().filter((message) => !message.deleted);
+  if (state.viewingHistory && state.historyWindow) {
+    messages = messages.filter(
+      (message) =>
+        Number(message.id) >= state.historyWindow.min &&
+        Number(message.id) <= state.historyWindow.max,
+    );
+  }
+  messages = messages.filter(
+    (message) => !(message.deferredClientId && state.pending.has(message.deferredClientId)),
+  );
   const pending = [...state.pending.values()].sort((a, b) => a.createdAt - b.createdAt);
   return messages.concat(pending);
 }

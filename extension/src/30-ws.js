@@ -619,6 +619,15 @@ function requestSyncAfter() {
   if (!sent) state.historyLoading = false;
 }
 
+function requestNewerMessages() {
+  if (!state.wsAuthenticated || state.historyLoading) return;
+  const ids = [...state.messages.keys()];
+  const after = ids.length ? Math.max(...ids) : 0;
+  state.historyLoading = true;
+  const sent = sendWs({ type: 'history', after, limit: 50 });
+  if (!sent) state.historyLoading = false;
+}
+
 function disconnectNoRules({ clear = false } = {}) {
   stopHeartbeat();
   if (state.reconnectTimer) {

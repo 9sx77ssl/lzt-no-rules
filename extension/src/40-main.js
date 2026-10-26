@@ -136,6 +136,17 @@ function deactivateRoom({ restoreHeader = true, nativeRoomClick = false } = {}) 
   state.active = false;
   state.replyTo = null;
   state.unread = 0;
+  if (state.viewingHistory) {
+    state.viewingHistory = false;
+    state.historyHasNewer = false;
+    state.historyWindow = null;
+    state.historyLoaded = false;
+    state.messages.clear();
+    state.deletedIds.clear();
+    state.oldestId = null;
+    state.lastMessageId = 0;
+  }
+  clearComposerError();
   document.getElementById('no-rules-reply')?.remove();
   document.getElementById('no-rules-editing')?.remove();
   document.getElementById('no-rules-paused')?.setAttribute('hidden', '');
@@ -450,6 +461,9 @@ function exposeDebugApi() {
     disconnect: () => disconnectNoRules(),
     requestHistory: () => requestInitialHistory(),
     requestOlder: () => requestOlderMessages(),
+    requestNear: (id) => requestHistoryNear(Number(id)),
+    jumpTo: (id) => scrollToMessage(Number(id)),
+    latest: () => returnToLatest(),
     normalizeHtml: (html) => normalizeClientHtml(String(html || '')),
     sanitizeHtml: (html) => sanitizeClientHtml(String(html || '')),
     enhanceHtml: (html) => enhanceUnfurls(String(html || '')),

@@ -91,6 +91,11 @@ test('stores users, sessions, messages and history', () => {
       [first.message.id, second.message.id],
     );
 
+    const near = db.getHistory({ near: first.message.id, limit: 3 });
+    assert.deepEqual(near.messages.map((m) => m.id), [first.message.id, second.message.id]);
+    assert.equal(near.hasMoreBefore, false);
+    assert.equal(near.hasMoreAfter, false);
+
     const edited = db.updateMessage({
       id: first.message.id,
       html: '<p>one edited</p>',

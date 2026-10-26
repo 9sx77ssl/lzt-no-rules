@@ -44,18 +44,45 @@ const NR_CSS = `
   font-size: 12px;
 }
 #no-rules-messages .nr-loading-top i { margin-right: 6px; }
-#no-rules-messages .nr-message-pending { opacity: .7; }
-#no-rules-messages .nr-message-pending.nr-failed { opacity: 1; }
-#no-rules-messages .nr-failed .chat2-message-block { box-shadow: 0 0 0 1px inset #ff6a708f; }
-#no-rules-messages .nr-retry {
-  color: #ff8b8f;
-  cursor: pointer;
-  margin-left: 8px;
-  font-size: 12px;
-  white-space: nowrap;
+#no-rules-messages .nr-message-pending {
+  opacity: .68;
+  transition: opacity .2s ease, transform .2s ease;
 }
-#no-rules-messages .nr-retry:hover { text-decoration: underline; }
-#no-rules-messages .nr-highlight .chat2-message-block { box-shadow: 0 0 0 2px var(--primaryMedium, #2f8a5d); transition: box-shadow .2s ease; }
+#no-rules-messages .nr-message-failed-out {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
+}
+#no-rules-messages .message-is-pending {
+  float: right;
+  align-self: flex-end;
+  margin-left: 8px;
+}
+#no-rules-messages .message-is-pending .fa-clock::before {
+  color: var(--mutedTextColor, #8c8c8c);
+  font-size: 12px;
+}
+#no-rules-messages .bbCodeImage { max-width: 100%; }
+#no-rules-messages .message-highlight {
+  animation: nr-message-highlight-animation 5s .3s;
+  margin: 0 -20px;
+  padding: 0 20px;
+}
+@keyframes nr-message-highlight-animation {
+  0% { background-color: transparent; }
+  30% { background-color: var(--primaryDarker, #232323); }
+  100% { background-color: transparent; }
+}
+#no-rules-compose-error {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .18s ease, transform .18s ease;
+  pointer-events: none;
+}
+#no-rules-compose-error.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
 #no-rules-messages .nr-swipe { transform: translateX(8px); transition: transform .12s ease; }
 
 #no-rules-reply .chat2-replying-text {
@@ -1168,7 +1195,7 @@ function openOnlineModal() {
 
 function updatePaused() {
   let paused = document.getElementById('no-rules-paused');
-  const shouldShow = state.active && state.unread > 0 && !isNearBottom();
+  const shouldShow = state.active && (state.viewingHistory || (state.unread > 0 && !isNearBottom()));
   if (!paused) {
     paused = document.createElement('div');
     paused.id = 'no-rules-paused';
@@ -1177,6 +1204,10 @@ function updatePaused() {
     paused.innerHTML = `<button type="button" class="${state.templates?.pausedButton || `chat2-paused-button ${HASH.paused}`}"><div class="${state.templates?.pausedText || `chat2-paused-text ${HASH.paused}`}"><span></span></div><div class="${state.templates?.pausedIcon || `chat2-paused-icon ${HASH.paused}`}"><i class="fas fa-angle-double-down"></i></div></button>`;
     paused.addEventListener('click', (event) => {
       event.preventDefault();
+      if (state.viewingHistory) {
+        returnToLatest();
+        return;
+      }
       state.unread = 0;
       updateUnreadBadge();
       updatePaused();
@@ -1186,7 +1217,9 @@ function updatePaused() {
     host.appendChild(paused);
   }
   const text = paused.querySelector('.chat2-paused-text span');
-  const nextText = `Новых сообщений: ${state.unread}`;
+  const nextText = state.viewingHistory
+    ? 'Вернуться к последним сообщениям'
+    : `Новых сообщений: ${state.unread}`;
   if (text && text.textContent !== nextText) text.textContent = nextText;
   if (paused.hidden !== !shouldShow) paused.hidden = !shouldShow;
 }
@@ -1222,6 +1255,53 @@ function updateConnectionError() {
   if (error.textContent !== state.connectionError) error.textContent = state.connectionError;
 }
 
+function updateComposerError() {
+  const existing = document.getElementById('no-rules-compose-error');
+  if (!state.active || !state.composerError) {
+    existing?.classList.remove('is-visible');
+    return;
+  }
+  const inputBox = getChatRoot()?.querySelector('.chat2-footer .chat2-inputBox');
+  if (!inputBox) {
+    existing?.classList.remove('is-visible');
+    return;
+  }
+  let error = existing;
+  if (!error || !error.isConnected) {
+    error = document.createElement('div');
+    error.id = 'no-rules-compose-error';
+    error.className = `chat2-error ${HASH.footer}`;
+    error.setAttribute('role', 'alert');
+    inputBox.appendChild(error);
+  }
+  if (error.textContent !== state.composerError) error.textContent = state.composerError;
+  // Restart the native-style slide/fade if a new error replaced the old one
+  // before the first one finished.
+  error.classList.remove('is-visible');
+  void error.offsetWidth;
+  error.classList.add('is-visible');
+}
+
+function showComposerError(message) {
+  const text = String(message || '').trim();
+  if (!text) return;
+  state.composerError = text;
+  if (state.composerErrorTimer) clearTimeout(state.composerErrorTimer);
+  state.composerErrorTimer = setTimeout(() => {
+    state.composerErrorTimer = null;
+    state.composerError = '';
+    updateComposerError();
+  }, 3000);
+  updateComposerError();
+}
+
+function clearComposerError() {
+  if (state.composerErrorTimer) clearTimeout(state.composerErrorTimer);
+  state.composerErrorTimer = null;
+  state.composerError = '';
+  updateComposerError();
+}
+
 function enforceActiveUI() {
   if (!state.initialized) return;
   const nativeMessages = getChatMessages();
@@ -1243,6 +1323,7 @@ function enforceActiveUI() {
     updateUnreadBadge();
     updatePaused();
     updateConnectionError();
+    updateComposerError();
     muteEditorVideos();
   } else {
     // While No Rules is inactive the native Svelte app owns this subtree and
@@ -1257,6 +1338,7 @@ function enforceActiveUI() {
     updateRoomLinkActive();
     updatePaused();
     updateConnectionError();
+    updateComposerError();
     muteEditorVideos();
   }
 }
@@ -1289,6 +1371,14 @@ function attachScrollListener() {
     }
     if (scroll.scrollTop < 80 && state.historyHasMore && !state.historyLoading) {
       requestOlderMessages();
+    }
+    if (
+      state.viewingHistory &&
+      state.historyHasNewer &&
+      !state.historyLoading &&
+      isNearBottom()
+    ) {
+      requestNewerMessages();
     }
   };
   scroll.addEventListener('scroll', state.scrollHandler, { passive: true });
@@ -1817,20 +1907,20 @@ function createMessageElement(message, { showHeader = true } = {}) {
   }
   text.appendChild(inner);
 
-  const date = document.createElement('span');
-  date.className = state.templates?.date || `chat2-message-date ${HASH.date} chat2-message-date-muted`;
-  const createdAt = new Date(message.createdAt || Date.now());
-  date.textContent = formatTime(createdAt);
-  date.title = formatFullDate(createdAt);
-  text.appendChild(date);
-
-  if (message.failed) {
-    const retry = document.createElement('span');
-    retry.className = 'nr-retry';
-    retry.dataset.nrRetry = message.clientId || '';
-    retry.textContent = 'Повторить';
-    retry.title = 'Повторить отправку';
-    text.appendChild(retry);
+  if (message.pending) {
+    const pending = document.createElement('div');
+    pending.className = `message-is-pending ${HASH.message}`;
+    const clock = document.createElement('span');
+    clock.className = `fas fa-clock ${HASH.message}`;
+    pending.appendChild(clock);
+    text.appendChild(pending);
+  } else {
+    const date = document.createElement('span');
+    date.className = state.templates?.date || `chat2-message-date ${HASH.date} chat2-message-date-muted`;
+    const createdAt = new Date(message.createdAt || Date.now());
+    date.textContent = formatTime(createdAt);
+    date.title = formatFullDate(createdAt);
+    text.appendChild(date);
   }
 
   block.appendChild(text);
@@ -2032,9 +2122,6 @@ function openMessageMenu(message, x, y, target = null) {
   };
 
   if (message.pending) {
-    if (message.failed) {
-      add(NR_ICONS.retry, 'Повторить отправку', () => retryPending(message.clientId));
-    }
     add(NR_ICONS.delete, 'Отменить сообщение', () => removePending(message.clientId));
   } else if (!message.deleted) {
     add(NR_ICONS.reply, 'Ответить', () => startReply(message));
@@ -2225,7 +2312,17 @@ function htmlToBbcode(html) {
       if (element.classList.contains('mceSmilie') && alt) return alt;
       if (element.classList.contains('avatar')) return '';
       const src = element.getAttribute('src') || '';
-      return src ? `[IMG]${src}[/IMG]` : '';
+      if (!src) return '';
+      const width = Number(element.getAttribute('width')) || 0;
+      const height = Number(element.getAttribute('height')) || 0;
+      if (width || height) {
+        const size = [
+          width ? `width=${Math.min(width, 5000)}` : '',
+          height ? `height=${Math.min(height, 5000)}` : '',
+        ].filter(Boolean).join(';');
+        return `[IMG=${size}]${src}[/IMG]`;
+      }
+      return `[IMG]${src}[/IMG]`;
     }
     if (tag === 'abbr') return element.textContent || '';
     if (tag === 'video') {
@@ -2327,29 +2424,22 @@ function firstMediaUrl(html) {
 function scrollToMessage(id) {
   const targetId = Number(id);
   if (!targetId) return;
-  let element = document.querySelector(
+  const element = document.querySelector(
     `#no-rules-messages [data-message-id="${targetId}"]`,
   );
   if (!element) {
-    if (state.historyHasMore && !state.historyLoading) {
-      requestOlderMessages();
-      setTimeout(() => {
-        element = document.querySelector(
-          `#no-rules-messages [data-message-id="${targetId}"]`,
-        );
-        if (element) highlightElement(element);
-      }, 900);
-    } else {
-      showToast('Сообщение находится в более старой истории', 'info');
-    }
+    if (!state.historyLoading) requestHistoryNear(targetId);
     return;
   }
   highlightElement(element);
 }
 
 function highlightElement(element) {
-  element.classList.add('nr-highlight');
+  if (!element) return;
+  element.classList.remove('message-highlight');
+  void element.offsetWidth;
+  element.classList.add('message-highlight');
   const block = element.querySelector('.chat2-message-block') || element;
-  block.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  setTimeout(() => element.classList.remove('nr-highlight'), 1600);
+  block.scrollIntoView({ block: 'center', behavior: 'instant' });
+  setTimeout(() => element.classList.remove('message-highlight'), 2300);
 }
