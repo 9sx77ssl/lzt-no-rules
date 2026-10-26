@@ -109,8 +109,13 @@ const NR_CSS = `
 #no-rules-messages .bbCodeImage { max-width: 100%; }
 #no-rules-messages .message-highlight {
   animation: nr-message-highlight-animation 5s .3s;
-  margin: 0 -20px;
-  padding: 0 20px;
+  /* Only extend the tint horizontally. A shorthand margin would wipe the
+     native 5px bottom margin and visually glue this message to the next one
+     for the whole highlight animation. */
+  margin-left: -20px;
+  margin-right: -20px;
+  padding-left: 20px;
+  padding-right: 20px;
 }
 @keyframes nr-message-highlight-animation {
   0% { background-color: transparent; }

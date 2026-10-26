@@ -42,7 +42,7 @@ GET /health
 {
   "ok": true,
   "name": "no-rules-chat",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "protocol": 1,
   "uptime": 123,
   "online": 2,
@@ -53,7 +53,7 @@ GET /health
 GET /version
 {
   "name": "no-rules-chat",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "protocol": 1,
   "publicUrl": "wss://lztws.d9v.uk/ws"
 }
@@ -66,7 +66,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 
 ## 3. Протокол
 
-Версия протокола: **1**. Клиент и сервер: **1.3.2**. Транспорт — WebSocket,
+Версия протокола: **1**. Клиент и сервер: **1.3.3**. Транспорт — WebSocket,
 текстовые кадры JSON.
 
 ### Подключение
@@ -75,7 +75,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 2. Сервер присылает `hello`:
 
 ```json
-{"type":"hello","protocol":1,"version":"1.3.2","roomTitle":"No Rules","serverTime":1792946496011}
+{"type":"hello","protocol":1,"version":"1.3.3","roomTitle":"No Rules","serverTime":1792946496011}
 ```
 
 3. Клиент отправляет `auth` (первый вход) или `resume` (есть сессия).
@@ -87,7 +87,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
   "type": "auth",
   "token": "<temporary forum JWT>",
   "accessKey": "<shared extension key>",
-  "clientVersion": "1.3.2"
+  "clientVersion": "1.3.3"
 }
 ```
 
@@ -121,7 +121,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 ### resume
 
 ```json
-{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.3.2"}
+{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.3.3"}
 ```
 
 Ответ такой же `auth.ok`; поле `resumed` есть только в логах сервера.
@@ -736,7 +736,7 @@ Playwright-сценарии лежат вне репозитория из-за `
 ### Сборка
 
 ```bash
-NR_VERSION=1.3.2 \
+NR_VERSION=1.3.3 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -944,6 +944,9 @@ production `.env` и реальные ID всё равно не должны п�
 
 Полный архив — [`CHANGELOG.md`](CHANGELOG.md). Ключевые вехи:
 
+- **1.3.3** — подсветка reply больше не сбрасывает нативный
+  `margin-bottom: 5px`, поэтому сообщение не липнет к следующему во время
+  анимации.
 - **1.3.2** — онлайн-модалка снова анимируется при
   `prefers-reduced-motion: reduce`, как модалка сокета.
 - **1.3.1** — убран лишний нижний padding: отступ последнего сообщения
