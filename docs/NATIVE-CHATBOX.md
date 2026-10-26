@@ -346,6 +346,21 @@ Plain `@nick` не является Tiptap-нодой. При отправке N
 - `@run-at document-start`, но DOM инициализируется только после появления
   `document.head`/`document.body`.
 
+## 11.1. Карточки и socket
+
+- В готовых сообщениях нативного Chatbox market-раздел приходит legacy-
+  разметкой `.unfurlContainer.shorted.marketItem`: высота карточки 24 px,
+  внешний line-box 28 px, сообщение с одной карточкой — 44 px.
+- Tiptap в редакторе может оставить `.unfurl-renderer` и хвост
+  `ProseMirror-widget + <br> + пустой <p>`; после отправки его нужно
+  нормализовать, иначе сообщение получает вторую пустую строку.
+- `market_search`-ноду Tiptap безопасно приводить к legacy-карточке с
+  `categoryIcon`, `.title`, `.price`, `.LinkClicker`.
+- Клик по `.chat2-socket-state` в нативном заголовке открывает модалку
+  `Отладка сокета: Соединение установлено` с проверками WebSocket, Socket,
+  SharedWorker. В No Rules используется тот же `chat2-socket-state`, но
+  проверки показывают auth, history, outbox и pong.
+
 ## 12. Что ещё проверять при изменениях
 
 1. Full chat и widget.
