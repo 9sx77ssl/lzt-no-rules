@@ -284,8 +284,11 @@ legacy-карточке `.unfurlContainer.shorted.marketItem` (24 px), а не �
 
 `ensureSocketIndicator()` создаёт `#no-rules-socket` в `.room-title` с нативным
 `chat2-socket-state`/`socket-connected`. Клик или Enter открывает модалку
-`Отладка сокета` с проверками WebSocket, auth, history, outbox, pong и
-reconnect. Нативный socket скрывается только на время активной комнаты.
+`Отладка сокета` с проверками WebSocket, auth, history, outbox, pong,
+reconnect и отдельным тестовым WebSocket-подключением. Используется
+`.modal.fade`/`.xenOverlay`: затемнение, fade/slide, закрытие по X, клику
+снаружи и Escape. Нативный socket скрывается только на время активной
+комнаты.
 
 При выходе из No Rules:
 - сохраняются `roomScrollTop`/`roomAtBottom`;
