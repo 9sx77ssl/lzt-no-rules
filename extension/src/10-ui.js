@@ -423,10 +423,6 @@ const NR_CSS = `
 }
 .no-rules-online-modal .helper { padding: 0; }
 body.nr-online-modal-open { overflow: hidden; }
-@media (prefers-reduced-motion: reduce) {
-  .nr-online-backdrop,
-  .no-rules-online-modal { transition: none; }
-}
 .no-rules-socket-modal {
   display: flex !important;
   position: fixed;

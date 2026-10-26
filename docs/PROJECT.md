@@ -30,7 +30,7 @@ scripts/
 Сборка склеивает модули в один IIFE в фиксированном порядке:
 
 ```bash
-NR_VERSION=1.3.1 \
+NR_VERSION=1.3.2 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -428,6 +428,11 @@ mountNativeModal({
 - фокус на крестик/модалку;
 - очистку probe/таймеров/listeners через `onClose`;
 - безопасное снятие body-lock, если открыта другая модалка.
+
+Обе модалки используют одинаковые `opacity`/`translateY` transition и
+backdrop-анимацию; отдельного `prefers-reduced-motion`-исключения только для
+онлайн-модалки больше нет, поэтому открытие/закрытие не отличаются от
+`Отладки сокета`.
 
 Онлайн-модалка — XenForo `modal > xenOverlay` с нативными
 `top-users-container`, `top-user-item lztng-yzgsen`, `user-abour-container`,
