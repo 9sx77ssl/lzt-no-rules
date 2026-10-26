@@ -468,6 +468,18 @@ function exposeDebugApi() {
     requestNear: (id) => requestHistoryNear(Number(id)),
     jumpTo: (id) => scrollToMessage(Number(id)),
     latest: () => returnToLatest(),
+    scrollInfo: () => {
+      const scroll = getScrollElement();
+      return scroll
+        ? {
+            cls: scroll.className,
+            top: scroll.scrollTop,
+            height: scroll.clientHeight,
+            scrollHeight: scroll.scrollHeight,
+            rect: scroll.getBoundingClientRect().toJSON(),
+          }
+        : null;
+    },
     normalizeHtml: (html) => normalizeClientHtml(String(html || '')),
     sanitizeHtml: (html) => sanitizeClientHtml(String(html || '')),
     enhanceHtml: (html) => enhanceUnfurls(String(html || '')),

@@ -118,12 +118,13 @@ const state = {
   connectionError: '',
   composerError: '',
   composerErrorTimer: null,
-  pendingCommitTimers: new Map(),
   viewingHistory: false,
   historyHasNewer: false,
   historyWindow: null,
   jumpTargetId: null,
   historyNewerReadyAt: 0,
+  suppressScrollLoadUntil: 0,
+  scrollPinToken: 0,
   authError: '',
   authFailedPermanently: false,
   templates: null,
@@ -2117,10 +2118,29 @@ async function resolvePlainUnfurls(html) {
 }
 
 function getScrollElement() {
+  const own = document.getElementById('no-rules-messages');
+  if (own && getComputedStyle(own).overflowY === 'auto') return own;
+  const candidates = [];
+  const add = (element) => {
+    if (element && !candidates.includes(element)) candidates.push(element);
+  };
   const nativeMessages = getChatMessages() || els.nativeMessagesEl;
-  const parent = nativeMessages?.parentElement;
-  if (parent && parent.classList.contains('scrollable-content')) return parent;
-  return getChatRoot()?.querySelector('.scrollable > .scrollable-content') || null;
+  add(nativeMessages?.parentElement?.classList.contains('scrollable-content')
+    ? nativeMessages.parentElement
+    : null);
+  const ownHost = document.getElementById('no-rules-messages')?.closest('.scrollable-content');
+  add(ownHost);
+  for (const element of getChatRoot()?.querySelectorAll('.scrollable-content') || []) {
+    add(element);
+  }
+  const visible = candidates.filter(
+    (element) => element.isConnected && element.clientHeight > 100 && element.getClientRects().length,
+  );
+  if (ownHost && visible.includes(ownHost)) return ownHost;
+  if (visible.length) {
+    return visible.sort((a, b) => b.clientHeight - a.clientHeight)[0];
+  }
+  return candidates[0] || null;
 }
 
 function isNearBottom(threshold = 140) {
@@ -2251,9 +2271,6 @@ function allVisibleMessages() {
         Number(message.id) <= state.historyWindow.max,
     );
   }
-  messages = messages.filter(
-    (message) => !(message.deferredClientId && state.pending.has(message.deferredClientId)),
-  );
   const pending = [...state.pending.values()].sort((a, b) => a.createdAt - b.createdAt);
   return messages.concat(pending);
 }

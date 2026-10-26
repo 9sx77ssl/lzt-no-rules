@@ -1,6 +1,5 @@
 /* Message rendering and message actions: grouping, optimistic sends,
  * history paging, replies, edits, deletes and the native typing indicator. */
-const PENDING_MIN_VISIBLE_MS = 900;
 function findMessage(id) {
   const numeric = Number(id);
   if (!Number.isFinite(numeric)) return null;
@@ -290,25 +289,11 @@ function handleIncomingMessage(payload) {
   updateLastMessageId([message]);
 
   if (pending) {
-    // The native chatbox keeps the clock visible until the request finishes.
-    // Server acks are usually much faster than a human can see, so keep the
-    // optimistic bubble for a short minimum and then swap in the real message.
-    const wait = Math.max(0, PENDING_MIN_VISIBLE_MS - (now() - Number(pending.createdAt || 0)));
+    // No artificial minimum: the clock is visible exactly while the socket
+    // request is in flight. On ack the real message replaces it immediately.
     state.outbox = state.outbox.filter((item) => item.clientId !== clientId);
     saveOutbox();
-    if (wait > 0) {
-      message.deferredClientId = clientId;
-      if (state.pendingCommitTimers.has(clientId)) {
-        clearTimeout(state.pendingCommitTimers.get(clientId));
-      }
-      const timer = setTimeout(() => {
-        state.pendingCommitTimers.delete(clientId);
-        removePending(clientId);
-      }, wait);
-      state.pendingCommitTimers.set(clientId, timer);
-    } else {
-      removePending(clientId);
-    }
+    removePending(clientId, { render: false });
   }
 
   const own = message.user.id === state.user?.id;
@@ -592,16 +577,13 @@ function deleteMessage(message) {
   }
 }
 
-function removePending(clientId) {
+function removePending(clientId, { render = true } = {}) {
   if (!clientId) return;
-  const timer = state.pendingCommitTimers.get(clientId);
-  if (timer) clearTimeout(timer);
-  state.pendingCommitTimers.delete(clientId);
   const pending = state.pending.get(clientId);
   if (pending) state.pending.delete(clientId);
   state.outbox = state.outbox.filter((payload) => payload.clientId !== clientId);
   saveOutbox();
-  if (pending && state.active) {
+  if (pending && state.active && render) {
     renderMessages({ preserveScroll: true, forceBottom: isNearBottom() });
   }
 }
@@ -611,10 +593,6 @@ function failPending(clientId, message) {
   if (!pending) {
     showComposerError(message);
     return;
-  }
-  if (state.pendingCommitTimers.has(clientId)) {
-    clearTimeout(state.pendingCommitTimers.get(clientId));
-    state.pendingCommitTimers.delete(clientId);
   }
   const wrapper = [...document.querySelectorAll('#no-rules-messages [data-nr-message]')]
     .find((element) => String(element.dataset.messageId) === String(pending.id));

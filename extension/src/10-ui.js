@@ -33,6 +33,14 @@ const NR_ONLINE_ICONS = [
 
 const NR_CSS = `
 #no-rules-messages.nr-hidden { display: none !important; }
+#no-rules-messages.nr-own-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
 #no-rules-messages .nr-loading-top {
   display: flex;
   align-items: center;
@@ -653,19 +661,18 @@ function ensureMessagesContainer() {
   }
 
   let container = document.getElementById('no-rules-messages');
+  const footer = chatRoot?.querySelector('.chat2-footer');
+  const host = chatRoot || nativeMessages?.parentElement;
   if (!container || !container.isConnected) {
     container = document.createElement('div');
     container.id = 'no-rules-messages';
-    container.className = `${state.templates?.messages || `chat2-messages lztng-content-background ${HASH.footer}`} nr-hidden`;
+    container.className = `${state.templates?.messages || `chat2-messages lztng-content-background ${HASH.footer}`} nr-own-scroll nr-hidden`;
     container.setAttribute('role', 'log');
     container.setAttribute('aria-live', 'polite');
     container.setAttribute('aria-relevant', 'additions');
-    if (nativeMessages?.isConnected) {
-      nativeMessages.after(container);
-    } else {
-      const footer = chatRoot?.querySelector('.chat2-footer');
-      if (footer) footer.before(container);
-      else chatRoot?.append(container);
+    if (host) {
+      if (footer?.parentElement === host) host.insertBefore(container, footer);
+      else host.appendChild(container);
     }
     els.messages = container;
     installMessageListeners(container);
@@ -674,8 +681,12 @@ function ensureMessagesContainer() {
     if (!container.classList.contains('chat2-messages')) {
       container.classList.add('chat2-messages', 'lztng-content-background', HASH.footer);
     }
-    if (nativeMessages?.isConnected && container.previousElementSibling !== nativeMessages) {
-      nativeMessages.after(container);
+    container.classList.add('nr-own-scroll');
+    if (container.closest('.scrollable-content') || container.parentElement !== host) {
+      if (host) {
+        if (footer?.parentElement === host) host.insertBefore(container, footer);
+        else host.appendChild(container);
+      }
     }
   }
   els.messages = container;
@@ -752,6 +763,7 @@ function hideNativeForRoom() {
   state.nativeMessagesEl = nativeMessages;
   const candidates = [
     nativeMessages,
+    nativeMessages.closest('.scrollable'),
     ...document.querySelectorAll(
       '.chat2-prevmessages-loading, .chat2-messages-loading, .chat2-paused:not(#no-rules-paused)',
     ),
@@ -1370,6 +1382,7 @@ function attachScrollListener() {
     } else {
       updatePaused();
     }
+    if (now() < state.suppressScrollLoadUntil) return;
     if (scroll.scrollTop < 80 && state.historyHasMore && !state.historyLoading) {
       requestOlderMessages();
     }
@@ -1384,6 +1397,15 @@ function attachScrollListener() {
     }
   };
   scroll.addEventListener('scroll', state.scrollHandler, { passive: true });
+  if (!scroll.dataset.nrWheelPin) {
+    scroll.dataset.nrWheelPin = '1';
+    const cancelScrollPin = () => {
+      state.scrollPinToken += 1;
+    };
+    scroll.addEventListener('wheel', cancelScrollPin, { passive: true });
+    scroll.addEventListener('touchstart', cancelScrollPin, { passive: true });
+    scroll.addEventListener('pointerdown', cancelScrollPin, { passive: true });
+  }
 }
 
 function createAvatar(user) {
@@ -2433,12 +2455,41 @@ function scrollToMessage(id) {
   highlightElement(element);
 }
 
+function scrollElementToCenter(element) {
+  if (!element?.isConnected) return false;
+  const block = element.querySelector('.chat2-message-block') || element;
+  const scroll = getScrollElement();
+  if (!scroll) {
+    block.scrollIntoView({ block: 'center' });
+    return true;
+  }
+  // scrollIntoView can pick a hidden Svelte scroller (height 0) or fight
+  // Firefox scroll anchoring while the highlight animation runs. Compute
+  // the position in the visible chat scroller explicitly.
+  const blockRect = block.getBoundingClientRect();
+  const scrollRect = scroll.getBoundingClientRect();
+  const target = scroll.scrollTop
+    + (blockRect.top - scrollRect.top)
+    - (scroll.clientHeight - blockRect.height) / 2;
+  const next = clamp(target, 0, Math.max(0, scroll.scrollHeight - scroll.clientHeight));
+  if (Math.abs(scroll.scrollTop - next) > 1) scroll.scrollTop = next;
+  return true;
+}
+
 function highlightElement(element) {
   if (!element) return;
   element.classList.remove('message-highlight');
   void element.offsetWidth;
   element.classList.add('message-highlight');
-  const block = element.querySelector('.chat2-message-block') || element;
-  block.scrollIntoView({ block: 'center', behavior: 'instant' });
+  state.suppressScrollLoadUntil = now() + 900;
+  const token = ++state.scrollPinToken;
+  const until = now() + 800;
+  const pin = () => {
+    if (token !== state.scrollPinToken || !element.isConnected) return;
+    scrollElementToCenter(element);
+    if (now() < until) requestAnimationFrame(pin);
+    else scrollElementToCenter(element);
+  };
+  pin();
   setTimeout(() => element.classList.remove('message-highlight'), 2300);
 }
