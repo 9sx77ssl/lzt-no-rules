@@ -113,7 +113,6 @@ const state = {
   roomAtBottom: true,
   roomSuspended: false,
   socketProbe: null,
-  socketDebugTimer: null,
   lastTypingAt: 0,
   connectionError: '',
   composerError: '',

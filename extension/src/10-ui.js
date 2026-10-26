@@ -76,6 +76,12 @@ const NR_CSS = `
   opacity: 1;
   transform: translateY(0);
 }
+.message-actions.nr-menu-in,
+.message-actions.nr-menu-in .menu,
+.message-actions.nr-menu-leave,
+.message-actions.nr-menu-leave .menu {
+  transition: opacity .1s linear, transform .1s linear;
+}
 .message-actions.nr-menu-leave,
 .message-actions.nr-menu-leave .menu {
   opacity: 0;
@@ -885,11 +891,103 @@ function createSocketInfoRow(label, value, { loading = false } = {}) {
   return row;
 }
 
-function onSocketDebugKeydown(event) {
-  if (event.key !== 'Escape') return;
-  event.preventDefault();
-  event.stopPropagation();
-  closeSocketDebug();
+
+/**
+ * Native-looking modal lifecycle shared by the socket debugger and the online
+ * list: backdrop + fixed shell, body scroll lock, fade/slide enter/exit,
+ * outside click, X and Escape. The content and close callbacks stay with the
+ * caller.
+ *
+ * @typedef {Object} NativeModalController
+ * @property {HTMLElement} modal
+ * @property {HTMLElement} backdrop
+ * @property {(immediate?: boolean) => void} close
+ */
+
+/**
+ * @param {{
+ *   id: string,
+ *   modal: HTMLElement,
+ *   backdrop: HTMLElement,
+ *   bodyClass: string,
+ *   closeDelay?: number,
+ *   onClose?: (() => void) | null,
+ *   focus?: HTMLElement | null
+ * }} options
+ * @returns {NativeModalController}
+ */
+function mountNativeModal({ id, modal, backdrop, bodyClass, closeDelay = 220, onClose = null, focus = null }) {
+  modal.id = id;
+  modal.dataset.nrModalBody = bodyClass;
+  backdrop.id = `${id}-backdrop`;
+  let closed = false;
+  let removeTimer = null;
+
+  const cleanup = () => {
+    document.removeEventListener('keydown', onKeydown, true);
+    if (removeTimer) clearTimeout(removeTimer);
+    removeTimer = null;
+  };
+
+  const remove = () => {
+    if (modal === document.getElementById(id)) modal.remove();
+    if (backdrop === document.getElementById(`${id}-backdrop`)) backdrop.remove();
+    if (!document.querySelector(`[data-nr-modal-body="${bodyClass}"]`)) {
+      document.body.classList.remove(bodyClass);
+    }
+  };
+
+  const close = (immediate = false) => {
+    if (closed) return;
+    closed = true;
+    cleanup();
+    try {
+      onClose?.();
+    } catch (error) {
+      console.debug('[NoRules:modal] close callback failed', error);
+    }
+    modal.classList.remove('in');
+    backdrop.classList.remove('in');
+    if (immediate) remove();
+    else removeTimer = setTimeout(remove, closeDelay);
+  };
+
+  function onKeydown(event) {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  }
+
+  const closer = modal.querySelector('.OverlayCloser');
+  closer?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    close();
+  });
+  backdrop.addEventListener('click', (event) => {
+    event.preventDefault();
+    close();
+  });
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) close();
+  });
+  document.addEventListener('keydown', onKeydown, true);
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(modal);
+  document.body.classList.add(bodyClass);
+  requestAnimationFrame(() => {
+    if (closed) return;
+    backdrop.classList.add('in');
+    modal.classList.add('in');
+  });
+  const focusTarget = focus || closer || modal;
+  requestAnimationFrame(() => {
+    if (!closed) focusTarget?.focus?.();
+  });
+
+  return { modal, backdrop, close };
 }
 
 function setSocketInfoRow(row, value, { loading = false } = {}) {
@@ -899,32 +997,21 @@ function setSocketInfoRow(row, value, { loading = false } = {}) {
 }
 
 function closeSocketDebug(immediate = false) {
+  const controller = state.socketModalController;
+  state.socketModalController = null;
+  if (controller) {
+    controller.close(immediate);
+    return;
+  }
   const modal = document.querySelector('.no-rules-socket-modal');
   const backdrop = document.querySelector('.nr-socket-backdrop');
-  if (state.socketDebugTimer) {
-    clearTimeout(state.socketDebugTimer);
-    state.socketDebugTimer = null;
-  }
   if (state.socketProbe) {
     try { state.socketProbe.close(1000, 'debug_close'); } catch { /* ignore */ }
     state.socketProbe = null;
   }
-  document.removeEventListener('keydown', onSocketDebugKeydown, true);
-  window.removeEventListener('keydown', onSocketDebugKeydown, true);
   document.body.classList.remove('nr-socket-modal-open');
-  if (!modal) {
-    backdrop?.remove();
-    return;
-  }
-  modal.classList.remove('in');
-  backdrop?.classList.remove('in');
-  const remove = () => {
-    if (modal === document.querySelector('.no-rules-socket-modal')) modal.remove();
-    if (backdrop === document.querySelector('.nr-socket-backdrop')) backdrop.remove();
-    state.socketDebugTimer = null;
-  };
-  if (immediate) remove();
-  else state.socketDebugTimer = setTimeout(remove, 220);
+  modal?.remove();
+  backdrop?.remove();
 }
 
 function probeSocketConnection(row) {
@@ -1018,29 +1105,20 @@ function openSocketDebug() {
   overlay.append(closer, section);
   section.append(title, helper);
   modal.appendChild(overlay);
-  document.body.append(backdrop, modal);
-  document.body.classList.add('nr-socket-modal-open');
-  requestAnimationFrame(() => {
-    backdrop.classList.add('in');
-    modal.classList.add('in');
+  state.socketModalController = mountNativeModal({
+    id: 'no-rules-socket-overlay',
+    modal,
+    backdrop,
+    bodyClass: 'nr-socket-modal-open',
+    closeDelay: 220,
+    focus: modal,
+    onClose: () => {
+      if (state.socketProbe) {
+        try { state.socketProbe.close(1000, 'debug_close'); } catch { /* ignore */ }
+        state.socketProbe = null;
+      }
+    },
   });
-
-  const close = (event) => {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-    closeSocketDebug();
-  };
-  closer.addEventListener('click', close);
-  backdrop.addEventListener('click', close);
-  modal.addEventListener('click', (event) => {
-    if (event.target === modal) close(event);
-  });
-  modal.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') close(event);
-  });
-  document.addEventListener('keydown', onSocketDebugKeydown, true);
-  window.addEventListener('keydown', onSocketDebugKeydown, true);
-  modal.focus();
   probeSocketConnection(probeRow);
 }
 function ensureSocketIndicator() {
@@ -1254,44 +1332,21 @@ function refreshOnlineModal() {
 }
 
 function closeOnlineModal(immediate = false) {
-  const modal = document.getElementById('no-rules-online-overlay');
-  const backdrop = document.getElementById('no-rules-online-backdrop');
-  if (state.onlineModalTimer) {
-    clearTimeout(state.onlineModalTimer);
-    state.onlineModalTimer = null;
-  }
-  document.removeEventListener('keydown', onOnlineModalKeydown, true);
-  if (!modal) {
-    document.body.classList.remove('nr-online-modal-open');
-    backdrop?.remove();
+  const controller = state.onlineModalController;
+  state.onlineModalController = null;
+  if (controller) {
+    controller.close(immediate);
     return;
   }
-  modal.classList.remove('in');
-  backdrop?.classList.remove('in');
-  const remove = () => {
-    if (modal === document.getElementById('no-rules-online-overlay')) modal.remove();
-    if (backdrop === document.getElementById('no-rules-online-backdrop')) backdrop.remove();
-    if (!document.getElementById('no-rules-online-overlay')) {
-      document.body.classList.remove('nr-online-modal-open');
-    }
-    state.onlineModalTimer = null;
-  };
-  if (immediate) remove();
-  else state.onlineModalTimer = setTimeout(remove, 220);
+  document.getElementById('no-rules-online-overlay')?.remove();
+  document.getElementById('no-rules-online-backdrop')?.remove();
+  document.body.classList.remove('nr-online-modal-open');
 }
 
-function onOnlineModalKeydown(event) {
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    event.stopPropagation();
-    closeOnlineModal();
-  }
-}
 
 function openOnlineModal() {
   closeOnlineModal(true);
   const modal = document.createElement('div');
-  modal.id = 'no-rules-online-overlay';
   modal.className = 'modal fade no-rules-online-modal';
   modal.dataset.zIndex = '10007';
   modal.style.zIndex = '10007';
@@ -1303,28 +1358,15 @@ function openOnlineModal() {
   fillOnlineUsers(modal.querySelector('.top-users-block'));
 
   const backdrop = document.createElement('div');
-  backdrop.id = 'no-rules-online-backdrop';
   backdrop.className = 'modal-backdrop fade nr-online-backdrop';
   backdrop.style.zIndex = '10006';
-  const close = (event) => {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-    closeOnlineModal();
-  };
-  modal.querySelector('.OverlayCloser')?.addEventListener('click', close);
-  modal.addEventListener('click', (event) => {
-    if (event.target === modal) close(event);
+  state.onlineModalController = mountNativeModal({
+    id: 'no-rules-online-overlay',
+    modal,
+    backdrop,
+    bodyClass: 'nr-online-modal-open',
+    closeDelay: 220,
   });
-  backdrop.addEventListener('click', close);
-  document.body.appendChild(backdrop);
-  document.body.appendChild(modal);
-  document.body.classList.add('nr-online-modal-open');
-  document.addEventListener('keydown', onOnlineModalKeydown, true);
-  requestAnimationFrame(() => {
-    backdrop.classList.add('in');
-    modal.classList.add('in');
-  });
-  setTimeout(() => modal.querySelector('.OverlayCloser')?.focus(), 30);
 }
 
 function updatePaused() {
