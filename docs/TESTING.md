@@ -15,7 +15,7 @@ sanitize. Playwright-сценарии лежат вне репозитория �
 ## 2. Сборка
 
 ```bash
-NR_VERSION=1.2.7 \
+NR_VERSION=1.2.8 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
