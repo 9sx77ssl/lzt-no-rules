@@ -29,6 +29,11 @@ function persistActiveUrl() {
   }
 }
 
+function scheduleRoomLinkEnsure() {
+  setTimeout(() => ensureRoomLink(), 80);
+  setTimeout(() => ensureRoomLink(), 300);
+}
+
 function activateRoom({ fromNotification = false } = {}) {
   if (!state.initialized) return;
   if (state.active) {
@@ -40,7 +45,9 @@ function activateRoom({ fromNotification = false } = {}) {
 
   cancelNativeComposerUI();
   state.nativeDraft = getEditorHtml();
+  const restoreScroll = !fromNotification && !state.roomAtBottom && state.roomScrollTop > 0;
   state.active = true;
+  state.roomSuspended = false;
   state.unread = 0;
   state.replyTo = null;
   state.editing = null;
@@ -52,8 +59,15 @@ function activateRoom({ fromNotification = false } = {}) {
   ensureMessagesContainer();
   restoreNoRulesDraft();
   enforceActiveUI();
-  renderMessages({ forceBottom: true });
-  scrollToBottom('auto');
+  renderMessages({ preserveScroll: restoreScroll, forceBottom: !restoreScroll });
+  if (restoreScroll) {
+    requestAnimationFrame(() => {
+      const scroll = getScrollElement();
+      if (scroll) scroll.scrollTop = state.roomScrollTop;
+    });
+  } else {
+    scrollToBottom('auto');
+  }
   updateRoomLinkActive();
   updateHeader();
   updateUnreadBadge();
@@ -90,6 +104,16 @@ function activateRoom({ fromNotification = false } = {}) {
 
 function deactivateRoom({ restoreHeader = true, nativeRoomClick = false } = {}) {
   if (!state.active) return;
+
+  const scroll = getScrollElement();
+  state.roomScrollTop = scroll?.scrollTop || 0;
+  state.roomAtBottom = isNearBottom();
+  state.roomSuspended = true;
+  clearTypingState();
+  if (state.draftTimer) {
+    clearTimeout(state.draftTimer);
+    state.draftTimer = null;
+  }
 
   if (state.editing) {
     state.editing = null;
@@ -180,6 +204,29 @@ function onDocumentClickCapture(event) {
     return;
   }
 
+  if (state.active) {
+    const spoilerButton = target.closest('.bbCodeSpoilerButton');
+    if (spoilerButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const targetNode = spoilerButton
+        .closest('.bbCodeSpoilerContainer')
+        ?.querySelector('.SpoilerTarget');
+      if (targetNode) {
+        targetNode.classList.toggle('nr-spoiler-hidden');
+        spoilerButton.classList.toggle('open');
+      }
+      return;
+    }
+    const quoteExpand = target.closest('.quoteExpand');
+    if (quoteExpand) {
+      event.preventDefault();
+      event.stopPropagation();
+      quoteExpand.closest('.bbCodeQuote')?.classList.toggle('expanded');
+      return;
+    }
+  }
+
   const roomLink = target.closest('.goto-room');
   if (roomLink) {
     if (roomLink.dataset.noRules === '1') {
@@ -192,7 +239,10 @@ function onDocumentClickCapture(event) {
     if (state.active) {
       deactivateRoom({ restoreHeader: false, nativeRoomClick: true });
     }
+    scheduleRoomLinkEnsure();
   }
+
+  if (target.closest('.side-menu-trigger')) scheduleRoomLinkEnsure();
 
   if (!state.active) return;
 
@@ -394,11 +444,16 @@ function exposeDebugApi() {
     version: BUILD.version,
     state: () => debugState(),
     activate: () => activateRoom(),
+    ensureLink: () => ensureRoomLink(),
     deactivate: () => deactivateRoom(),
     reconnect: () => connectNoRules({ forceToken: true, userInitiated: true }),
     disconnect: () => disconnectNoRules(),
     requestHistory: () => requestInitialHistory(),
     requestOlder: () => requestOlderMessages(),
+    normalizeHtml: (html) => normalizeClientHtml(String(html || '')),
+    sanitizeHtml: (html) => sanitizeClientHtml(String(html || '')),
+    enhanceHtml: (html) => enhanceUnfurls(String(html || '')),
+    bbcodeHtml: (html) => resolveBbcode(String(html || '')),
     simulateTyping: (username = 'test') => {
       if (!state.active) activateRoom();
       markTyping({ id: 999999999, username: String(username || 'test').slice(0, 32) });

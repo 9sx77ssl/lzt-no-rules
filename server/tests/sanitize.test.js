@@ -87,3 +87,17 @@ test('a normal plain image message survives', () => {
   assert.ok(result.text.includes('[IMG]'));
   assert.ok(result.html.includes('LbTrigger'));
 });
+
+test('keeps rendered BBCode blocks, styles and spoiler controls', () => {
+  const html =
+    '<div class="bbCodeBlock bbCodeQuote" data-author="root"><aside><blockquote class="quoteContainer"><div class="quote">text</div><div class="quoteExpand">open</div></blockquote></aside></div>' +
+    '<div class="ToggleTriggerAnchor bbCodeSpoilerContainer" style="text-align:left"><button type="button" class="button bbCodeSpoilerButton ToggleTrigger Tooltip JsOnly" title="spoiler" data-target="> .SpoilerTarget"><span>Спойлер</span></button><div class="SpoilerTarget bbCodeSpoilerText nr-spoiler-hidden">hidden</div></div>' +
+    '<p><span style="color:red;font-size:26px">red</span></p><ul><li>one</li></ul>';
+  const result = sanitizer.sanitizeMessage(html);
+  assert.match(result.html, /bbCodeQuote/);
+  assert.match(result.html, /data-author="root"/);
+  assert.match(result.html, /bbCodeSpoilerButton/);
+  assert.match(result.html, /nr-spoiler-hidden/);
+  assert.match(result.html, /font-size:26px/);
+  assert.match(result.html, /<ul><li>one<\/li><\/ul>/);
+});

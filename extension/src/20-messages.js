@@ -185,7 +185,7 @@ function renderTypingOnly() {
 }
 
 function markTyping(user) {
-  if (!user?.id || user.id === state.user?.id) return;
+  if (!state.active || !user?.id || user.id === state.user?.id) return;
   const previous = state.typing.get(user.id);
   if (previous?.timer) clearTimeout(previous.timer);
   const entry = {
@@ -210,6 +210,13 @@ function removeTyping(userId) {
   if (entry.timer) clearTimeout(entry.timer);
   state.typing.delete(Number(userId));
   renderTypingOnly();
+}
+
+function clearTypingState() {
+  for (const entry of state.typing.values()) {
+    if (entry.timer) clearTimeout(entry.timer);
+  }
+  state.typing.clear();
 }
 
 function mergeHistoryMessages(messages, { mode = 'initial' } = {}) {
@@ -489,7 +496,7 @@ async function saveEdit() {
     cancelEdit({ restore: true });
     return;
   }
-  const rawHtml = resolveBbcode(getEditorHtml());
+  const rawHtml = resolveBbcode(normalizeClientHtml(getEditorHtml()));
   const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
   let html = rawHtml;
   try {
@@ -625,7 +632,7 @@ async function sendCurrentMessage() {
     showToast('Подключение ещё не завершено. Подождите немного.', 'error');
     return;
   }
-  const rawHtml = resolveBbcode(getEditorHtml());
+  const rawHtml = resolveBbcode(normalizeClientHtml(getEditorHtml()));
   const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
   let html = rawHtml;
   try {

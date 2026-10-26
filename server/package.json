@@ -1,6 +1,6 @@
 {
   "name": "no-rules-chat-server",
-  "version": "1.1.20",
+  "version": "1.1.21",
   "private": true,
   "type": "module",
   "description": "WebSocket/HTTP backend for the No Rules Chatbox room",

@@ -9,13 +9,13 @@ cd server
 npm test
 ```
 
-`npm test` запускает 21 unit-тест: auth, antibot, db, rate limit,
+`npm test` запускает 22 unit-теста: auth, antibot, db, rate limit,
 sanitize. Playwright-сценарии лежат вне репозитория из-за storageState.
 
 ## 2. Сборка
 
 ```bash
-NR_VERSION=1.1.20 \
+NR_VERSION=1.1.21 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -199,7 +199,7 @@ DELETE FROM messages WHERE client_id LIKE 'seed-history-%';
 
 ## 9. Чек-лист перед релизом
 
-- [ ] `npm test` — 21/21.
+- [ ] `npm test` — 22/22.
 - [ ] `node --check extension/dist/no-rules.user.js`.
 - [ ] Desktop Chromium: все пункты раздела 4.
 - [ ] Mobile: нет горизонтального скролла, меню работает.

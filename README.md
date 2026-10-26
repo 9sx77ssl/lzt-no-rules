@@ -12,7 +12,7 @@ fancybox и XenForo video player.
 - Userscript:
   <https://raw.githubusercontent.com/9sx77ssl/lzt-no-rules/main/extension/dist/no-rules.user.js>
 - Репозиторий: <https://github.com/9sx77ssl/lzt-no-rules>
-- Текущая версия: **1.1.20**
+- Текущая версия: **1.1.21**
 
 > No Rules — не замена приватных чатов и не E2E-шифрование. Сообщения
 > лежат в SQLite на сервере и доступны администратору сервера. Пароль,
@@ -195,11 +195,11 @@ antibot-файлы не коммитятся: в них могут быть то
 - В Tampermonkey должна быть **одна** копия No Rules. Старые версии
   (`1.0.1`, `1.1.8`, копии с другим `@namespace`) нужно удалить: они
   конфликтуют, рисуют старый баннер и мешают auth.
-- После установки проверьте `@version` в Dashboard — текущая **1.1.20**.
+- После установки проверьте `@version` в Dashboard — текущая **1.1.21**.
 - Если raw ещё кешируется, обновите страницу/подождите несколько минут;
   `@updateURL`/`@downloadURL` указывают на `main`.
 - Firefox content-script WebSocket может отправлять `Origin: null`; сервер
-  Сервер 1.1.19+ (сейчас 1.1.20) принимает его как missing origin, но всё равно требует read-JWT.
+  Сервер 1.1.19+ (сейчас 1.1.21) принимает его как missing origin, но всё равно требует read-JWT.
 - Userscript использует абсолютные URL и строковый `fetch`: форумный
   `window.fetch` в Firefox не принимает `URL`-объекты.
 
@@ -231,7 +231,7 @@ curl -fsS http://127.0.0.1:8787/version
 
 ```bash
 cd server && bun install && cd ..
-NR_VERSION=1.1.20 \
+NR_VERSION=1.1.21 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -373,19 +373,19 @@ Playwright-сценарии (полный список — [docs/TESTING.md](doc
 ### «Нет связи с форумом»
 
 - Проверьте `/health` и вход на форум.
-- В Firefox обновите userscript до 1.1.20 (абсолютные fetch URL).
+- В Firefox обновите userscript до 1.1.21 (абсолютные fetch URL).
 - Нажмите на нативный `.chat2-error` — он повторяет auth.
 
 ### Видео показывает только первый кадр
 
-- Обновите до 1.1.20: плеер монтируется через `XenForo.activate`.
+- Обновите до 1.1.21: плеер монтируется через `XenForo.activate`.
 - Не должно быть двух копий userscript.
 - Откройте консоль: `XenForo` должен быть объектом, `.video` — внутри
   `#no-rules-messages`.
 
 ### Фото не открывается
 
-- Обновите до 1.1.20: bare `<img>` оборачивается в `LbTrigger`.
+- Обновите до 1.1.21: bare `<img>` оборачивается в `LbTrigger`.
 - Проверьте, что fancybox не блокируется другим расширением.
 
 ### Смайл не увеличивается

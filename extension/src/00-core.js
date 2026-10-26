@@ -109,6 +109,9 @@ const state = {
   editDraft: '',
   nativeDraft: '',
   draft: '',
+  roomScrollTop: 0,
+  roomAtBottom: true,
+  roomSuspended: false,
   lastTypingAt: 0,
   connectionError: '',
   authError: '',
@@ -364,6 +367,7 @@ const CLIENT_ALLOWED_TAGS = new Set([
   'code',
   'pre',
   'blockquote',
+  'aside',
   'ul',
   'ol',
   'li',
@@ -377,6 +381,7 @@ const CLIENT_ALLOWED_TAGS = new Set([
   'abbr',
   'video',
   'source',
+  'button',
   'svg',
   'g',
   'path',
@@ -416,6 +421,31 @@ const CLIENT_ALLOWED_CLASSES = new Set([
   'alertAction',
   'notranslate',
   'Tooltip',
+  'bbCodeBlock',
+  'bbCodeQuote',
+  'quoteContainer',
+  'quote',
+  'quoteExpand',
+  'quoteAuthor',
+  'ToggleTriggerAnchor',
+  'bbCodeSpoilerContainer',
+  'bbCodeSpoilerButton',
+  'ToggleTrigger',
+  'JsOnly',
+  'SpoilerTitle',
+  'arrowWidget',
+  'SpoilerTarget',
+  'bbCodeSpoilerText',
+  'content--align--left',
+  'content--align--center',
+  'content--align--right',
+  'button',
+  'primary',
+  'bbCodeCode',
+  'bbCodePrice',
+  'CensorSpoiler',
+  'nr-spoiler-hidden',
+  'bbCodePlain',
   'muted',
   'unfurlContainer',
   'unfurlLink',
@@ -496,6 +526,9 @@ const CLIENT_ALLOWED_STYLE_PROPS = new Map([
   ['text-shadow', /^[0-9a-z#.,%()\s-]{1,200}$/i],
   ['font-weight', /^(normal|bold|bolder|lighter|[1-9]00)$/i],
   ['white-space', /^(normal|nowrap|pre|pre-wrap)$/i],
+  ['font-size', /^(?:9|10|12|15|18|22|26)px$/i],
+  ['text-align', /^(?:left|center|right)$/i],
+  ['text-decoration', /^(?:underline|line-through|none)$/i],
 ]);
 
 function sanitizeClientStyle(value) {
@@ -673,9 +706,54 @@ function sanitizeUsernameHtml(html) {
   return template.innerHTML;
 }
 
-function sanitizeClientHtml(html) {
+/**
+ * Remove Tiptap's editor-only trailing nodes. A sent message otherwise keeps
+ * `<div class="ProseMirror-widget"></div><br><p></p>` after an unfurl card,
+ * which adds an empty line box and makes the message look twice as tall.
+ * This is intentionally a DOM normalizer, not a second HTML sanitizer.
+ *
+ * @param {string} html
+ * @returns {string}
+ */
+function normalizeClientHtml(html) {
   const template = document.createElement('template');
   template.innerHTML = String(html ?? '');
+
+  for (const widget of [...template.content.querySelectorAll('.ProseMirror-widget')]) {
+    widget.remove();
+  }
+
+  const hasMeaningfulContent = (node) =>
+    Boolean(node.querySelector('img, video, audio, iframe, hr, .unfurl-renderer, .unfurlContainer, .embed-link'));
+
+  // Tiptap leaves an empty line after a node view. Drop only the trailing
+  // whitespace/br/empty-p sequence; blank lines inside the message stay.
+  for (;;) {
+    const last = template.content.lastChild;
+    if (!last) break;
+    if (last.nodeType === Node.TEXT_NODE && !String(last.textContent || '').trim()) {
+      last.remove();
+      continue;
+    }
+    if (last.nodeType !== Node.ELEMENT_NODE) break;
+    const element = /** @type {Element} */ (last);
+    if (element.tagName === 'BR') {
+      element.remove();
+      continue;
+    }
+    if (element.tagName === 'P' && !String(element.textContent || '').trim() && !hasMeaningfulContent(element)) {
+      element.remove();
+      continue;
+    }
+    break;
+  }
+
+  return template.innerHTML;
+}
+
+function sanitizeClientHtml(html) {
+  const template = document.createElement('template');
+  template.innerHTML = normalizeClientHtml(html);
   const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT);
   const nodes = [];
   while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -1226,16 +1304,17 @@ function createMarketItemCard(url, data) {
   title.className = 'title';
   title.textContent = String(data?.title || 'Аккаунт');
   const priceValue = formatMarketPrice(extra.price);
-  const price = document.createElement('div');
-  price.className = 'price';
+  text.append(iconWrap, title);
   if (priceValue) {
+    const price = document.createElement('div');
+    price.className = 'price';
     const value = document.createElement('span');
     value.className = 'Value';
     value.setAttribute('data-value', String(extra.price));
     value.textContent = priceValue;
     price.appendChild(value);
+    text.appendChild(price);
   }
-  text.append(iconWrap, title, price);
   const link = document.createElement('a');
   link.className = 'LinkClicker';
   link.href = url;
@@ -1400,8 +1479,21 @@ function bbcodeAttr(match) {
 }
 
 function bbcodeCloseIndex(text, tag, from) {
-  const match = new RegExp(`\\[/${tag}\\]`, 'i').exec(text.slice(from));
-  return match ? from + match.index : -1;
+  // Match the correct closing tag for nested equal tags instead of taking the
+  // first one: [B]a[B]b[/B]c[/B] must keep the outer tag open.
+  const token = new RegExp(`\\[\\/?${tag}(?:=[^\\]]*)?\\]`, 'gi');
+  let depth = 1;
+  let match;
+  token.lastIndex = from;
+  while ((match = token.exec(text))) {
+    if (match[0][1] === '/') {
+      depth -= 1;
+      if (depth === 0) return match.index;
+    } else {
+      depth += 1;
+    }
+  }
+  return -1;
 }
 
 function bbcodeImageElement(url) {
@@ -1438,6 +1530,118 @@ function bbcodeUserElement(inner, id) {
   return anchor;
 }
 
+function bbcodeColorValue(value) {
+  const color = String(value || '').trim();
+  if (!/^(#[0-9a-f]{3,8}|rgba?\([^)]{1,80}\)|hsla?\([^)]{1,80}\)|[a-z]{3,20})$/i.test(color)) {
+    return '';
+  }
+  return color;
+}
+
+function bbcodeSizeValue(value) {
+  const raw = String(value || '').trim();
+  const relative = raw.match(/^([+-])(\d+)$/);
+  const level = relative
+    ? Math.max(1, Math.min(7, 4 + (relative[1] === '+' ? 1 : -1) * Number(relative[2])))
+    : Number(raw);
+  const sizes = [9, 10, 12, 15, 18, 22, 26];
+  return Number.isInteger(level) && level >= 1 && level <= 7 ? `${sizes[level - 1]}px` : '';
+}
+
+function bbcodeQuoteElement(inner, author) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'bbCodeBlock bbCodeQuote';
+  const name = String(author || '').trim();
+  if (name) wrapper.dataset.author = name;
+  const aside = document.createElement('aside');
+  const blockquote = document.createElement('blockquote');
+  blockquote.className = 'quoteContainer';
+  const quote = document.createElement('div');
+  quote.className = 'quote';
+  if (name) {
+    const quoteAuthor = document.createElement('span');
+    quoteAuthor.className = 'quoteAuthor';
+    const username = document.createElement('span');
+    username.className = 'username';
+    const nickname = document.createElement('span');
+    nickname.className = 'styleUserNickname';
+    nickname.textContent = name;
+    username.appendChild(nickname);
+    quoteAuthor.appendChild(username);
+    quote.appendChild(quoteAuthor);
+  }
+  quote.appendChild(parseBbcodeFragment(inner));
+  const expand = document.createElement('div');
+  expand.className = 'quoteExpand';
+  expand.textContent = 'Нажмите, чтобы раскрыть...';
+  blockquote.append(quote, expand);
+  aside.appendChild(blockquote);
+  wrapper.appendChild(aside);
+  return wrapper;
+}
+
+function bbcodeSpoilerElement(inner, title) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ToggleTriggerAnchor bbCodeSpoilerContainer';
+  wrapper.style.textAlign = 'left';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'button bbCodeSpoilerButton ToggleTrigger Tooltip JsOnly';
+  button.title = 'Раскрыть или скрыть спойлер';
+  button.dataset.target = '> .SpoilerTarget';
+  const label = document.createElement('span');
+  const heading = String(title || '').trim();
+  if (heading) {
+    const titleNode = document.createElement('span');
+    titleNode.className = 'SpoilerTitle';
+    titleNode.textContent = heading;
+    label.appendChild(titleNode);
+  } else {
+    label.appendChild(document.createTextNode('Спойлер'));
+  }
+  const arrow = document.createElement('span');
+  arrow.className = 'arrowWidget';
+  label.appendChild(arrow);
+  button.appendChild(label);
+  const target = document.createElement('div');
+  target.className = 'SpoilerTarget bbCodeSpoilerText nr-spoiler-hidden';
+  target.appendChild(parseBbcodeFragment(inner));
+  wrapper.append(button, target);
+  return wrapper;
+}
+
+function bbcodeAlignElement(inner, align) {
+  const wrapper = document.createElement('div');
+  wrapper.className = `content--align--${align}`;
+  wrapper.style.textAlign = align;
+  wrapper.appendChild(parseBbcodeFragment(inner));
+  return wrapper;
+}
+
+function bbcodeListElement(inner, ordered) {
+  const list = document.createElement(ordered ? 'ol' : 'ul');
+  const parts = String(inner || '').split(/\[\*\]/i);
+  const items = parts.length > 1 ? parts.slice(1) : [String(inner || '')];
+  for (const part of items) {
+    const content = part.replace(/\n$/,'');
+    if (!content.trim() && items.length > 1) continue;
+    const item = document.createElement('li');
+    item.appendChild(parseBbcodeFragment(content));
+    list.appendChild(item);
+  }
+  return list;
+}
+
+function bbcodeMediaUrl(value, inner) {
+  const site = String(value || '').trim().toLowerCase();
+  const raw = String(inner || value || '').trim();
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (!site || !raw) return '';
+  if (site === 'youtube') return `https://www.youtube.com/watch?v=${encodeURIComponent(raw)}`;
+  if (site === 'soundcloud') return `https://soundcloud.com/${raw.replace(/^\/+/, '')}`;
+  return '';
+}
+
 function bbcodeElement(tag, value, inner) {
   switch (tag) {
     case 'b':
@@ -1464,16 +1668,73 @@ function bbcodeElement(tag, value, inner) {
       return el;
     }
     case 'code':
-    case 'pre': {
-      const el = document.createElement(tag);
-      el.textContent = inner;
-      return el;
+    case 'pre':
+    case 'php':
+    case 'html':
+    case 'src': {
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      if (tag !== 'code' && tag !== 'pre') code.dataset.lang = tag.toUpperCase();
+      code.textContent = String(inner || '').replace(/<br\s*\/?>/gi, '\n');
+      pre.appendChild(code);
+      return pre;
     }
     case 'quote':
     case 'blockquote': {
-      const el = document.createElement('blockquote');
+      return bbcodeQuoteElement(inner, value);
+    }
+    case 'spoiler': {
+      return bbcodeSpoilerElement(inner, value);
+    }
+    case 'list': {
+      return bbcodeListElement(inner, Boolean(String(value || '').trim()));
+    }
+    case 'center':
+    case 'left':
+    case 'right': {
+      return bbcodeAlignElement(inner, tag);
+    }
+    case 'color': {
+      const color = bbcodeColorValue(value);
+      if (!color) return null;
+      const el = document.createElement('span');
+      el.style.color = color;
       el.appendChild(parseBbcodeFragment(inner));
       return el;
+    }
+    case 'size': {
+      const size = bbcodeSizeValue(value);
+      if (!size) return null;
+      const el = document.createElement('span');
+      el.style.fontSize = size;
+      el.appendChild(parseBbcodeFragment(inner));
+      return el;
+    }
+    case 'plain': {
+      const el = document.createElement('span');
+      el.className = 'bbCodePlain';
+      el.textContent = inner;
+      return el;
+    }
+    case 'price': {
+      const amount = String(inner || '').trim().replace(',', '.');
+      if (!/^\d+(?:\.\d+)?$/.test(amount)) return null;
+      const currency = String(value || 'RUB').trim().toUpperCase().slice(0, 3);
+      const el = document.createElement('span');
+      el.className = 'bbCodePrice';
+      el.dataset.priceCurrency = currency;
+      el.dataset.priceAmount = amount;
+      el.textContent = `${amount} ${currency === 'RUB' ? '₽' : currency}`;
+      return el;
+    }
+    case 'censor': {
+      const el = document.createElement('div');
+      el.className = 'CensorSpoiler';
+      el.appendChild(parseBbcodeFragment(inner));
+      return el;
+    }
+    case 'hr': {
+      return document.createElement('hr');
     }
     case 'img': {
       return bbcodeImageElement(inner || value);
@@ -1490,10 +1751,10 @@ function bbcodeElement(tag, value, inner) {
       return video;
     }
     case 'media': {
-      const url = String(inner || value || '').trim();
-      if (!/^https?:\/\//i.test(url)) return null;
-      const site = String(value || mediaServiceForUrl(url) || 'media').toLowerCase();
-      return createMediaCard(url, { media: { siteId: site, mediaId: url } });
+      const mediaUrl = bbcodeMediaUrl(value, inner);
+      if (!mediaUrl) return null;
+      const site = String(value || mediaServiceForUrl(mediaUrl) || 'media').toLowerCase();
+      return createMediaCard(mediaUrl, { media: { siteId: site, mediaId: mediaUrl } });
     }
     case 'unfurl': {
       const url = String(value || inner || '').trim();
@@ -1510,6 +1771,25 @@ function bbcodeElement(tag, value, inner) {
       const anchor = document.createElement('a');
       anchor.href = url;
       anchor.textContent = inner && !/^https?:\/\//i.test(inner) ? inner : url;
+      return anchor;
+    }
+    case 'email': {
+      const email = String(value || inner || '').trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+      const anchor = document.createElement('a');
+      anchor.href = `mailto:${email}`;
+      anchor.textContent = inner && inner !== email ? inner : email;
+      return anchor;
+    }
+    case 'button': {
+      const href = String(value || '').trim();
+      if (!/^https?:\/\//i.test(href)) return null;
+      const anchor = document.createElement('a');
+      anchor.className = 'button primary';
+      anchor.href = href;
+      anchor.target = '_blank';
+      anchor.rel = 'nofollow noopener';
+      anchor.textContent = inner || href;
       return anchor;
     }
     case 'user': {
@@ -1544,6 +1824,11 @@ function parseBbcodeFragment(text) {
       cursor = tokenEnd;
       continue;
     }
+    if (tag === 'hr') {
+      fragment.appendChild(bbcodeElement(tag, bbcodeAttr(match), ''));
+      cursor = tokenEnd;
+      continue;
+    }
     const closeIndex = bbcodeCloseIndex(text, tag, tokenEnd);
     if (closeIndex < 0) {
       fragment.appendChild(document.createTextNode(match[0]));
@@ -1565,12 +1850,30 @@ function resolveBbcode(html) {
   if (!/\[[a-z]+(?:=[^\]]*)?\]/i.test(source)) return source;
   const template = document.createElement('template');
   template.innerHTML = source;
+
+  // Tiptap turns newlines into <br>; parse plain text blocks as one string so
+  // [LIST], [QUOTE] and [SPOILER] can span several visual lines.
+  for (const block of [...template.content.querySelectorAll('p, div, li')]) {
+    if (block.closest('code, pre, textarea')) continue;
+    if (block.querySelector('*:not(br)')) continue;
+    const clone = block.cloneNode(true);
+    for (const br of [...clone.querySelectorAll('br')]) br.replaceWith('\n');
+    const text = clone.textContent || '';
+    if (!/\[[a-z]+(?:=[^\]]*)?\]/i.test(text)) continue;
+    const parsed = parseBbcodeFragment(text);
+    const hasBlock = [...parsed.children].some((element) =>
+      /^(ADDRESS|ARTICLE|ASIDE|BLOCKQUOTE|DIV|HR|OL|P|PRE|SECTION|UL)$/.test(element.tagName),
+    );
+    if (hasBlock && block.tagName === 'P') block.replaceWith(parsed);
+    else block.replaceChildren(parsed);
+  }
+
   const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
   const nodes = [];
   while (walker.nextNode()) {
     const node = walker.currentNode;
     if (!/\[[a-z]+(?:=[^\]]*)?\]/i.test(node.nodeValue || '')) continue;
-    if (node.parentElement?.closest('code, pre, textarea')) continue;
+    if (node.parentElement?.closest('code, pre, textarea, .bbCodePlain')) continue;
     nodes.push(node);
   }
   for (const node of nodes) {

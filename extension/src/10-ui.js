@@ -195,6 +195,7 @@ const NR_CSS = `
   display: inline-block;
   vertical-align: middle;
   max-width: 100%;
+  line-height: 0;
 }
 :is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-wrapper {
   position: relative;
@@ -209,7 +210,7 @@ const NR_CSS = `
   max-width: 100%;
   min-width: 0;
   width: fit-content !important;
-  margin: 2px 0;
+  margin: 0;
   transition: all 0.1s ease-in-out;
 }
 :is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-wrapper:hover {
@@ -251,7 +252,7 @@ const NR_CSS = `
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 6px;
+  padding: 1px 6px;
   border-radius: 8px;
   background-color: #ffffff14;
   box-shadow: 0 0 0 1px inset #ffffff1f;
@@ -261,7 +262,7 @@ const NR_CSS = `
   overflow: hidden;
   width: fit-content !important;
   margin: 2px 0;
-  line-height: 24px;
+  line-height: 20px;
   transition: all 0.1s ease-in-out;
 }
 :is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .forum-wrapper:hover {
@@ -283,6 +284,22 @@ const NR_CSS = `
 }
 :is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .unfurl-renderer a {
   border: 1px solid transparent;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .nr-spoiler-hidden {
+  display: none !important;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .content--align--center {
+  text-align: center;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .content--align--right {
+  text-align: right;
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .quoteExpand {
+  cursor: pointer;
+  color: var(--mutedTextColor, #8c8c8c);
+}
+:is(#no-rules-messages, #no-rules-reply, #no-rules-editing, .reply-message) .bbCodeSpoilerButton {
+  cursor: pointer;
 }
 
 .nr-room-unread {
@@ -670,11 +687,120 @@ function showNativeForRoom() {
   state.hiddenNative = [];
 }
 
+function socketStatusLabel(status = state.wsState) {
+  if (status === 'connected') return 'Соединение установлено';
+  if (status === 'connecting') return 'Подключение';
+  return 'Соединение потеряно';
+}
+
+function createSocketInfoRow(label, value, { loading = false } = {}) {
+  const row = document.createElement('div');
+  row.className = 'socket-info lztng-1nmmnl8';
+  const line = document.createElement('span');
+  const strong = document.createElement('b');
+  strong.textContent = label;
+  line.append(strong, document.createTextNode(` ${value}`));
+  if (loading) {
+    const icon = document.createElement('div');
+    icon.className = 'loadingIcon lztng-1nmmnl8';
+    line.appendChild(icon);
+  }
+  row.appendChild(line);
+  return row;
+}
+
+function onSocketDebugKeydown(event) {
+  if (event.key !== 'Escape') return;
+  event.preventDefault();
+  event.stopPropagation();
+  closeSocketDebug();
+}
+
+function closeSocketDebug() {
+  document.querySelector('.no-rules-socket-modal')?.remove();
+  document.removeEventListener('keydown', onSocketDebugKeydown, true);
+}
+
+function openSocketDebug() {
+  closeSocketDebug();
+  const modal = document.createElement('div');
+  modal.className = 'modal fade in no-rules-socket-modal';
+  modal.dataset.zIndex = '10007';
+  modal.style.zIndex = '10007';
+  modal.tabIndex = -1;
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'xenOverlay';
+  overlay.style.top = '10%';
+  const closer = document.createElement('a');
+  closer.className = 'close OverlayCloser';
+  closer.href = '#';
+  closer.setAttribute('aria-label', 'Закрыть');
+  const section = document.createElement('div');
+  section.className = 'sectionMain';
+  const title = document.createElement('h2');
+  title.className = 'heading h1';
+  title.textContent = `Отладка сокета: ${socketStatusLabel()}`;
+  const helper = document.createElement('div');
+  helper.className = 'helper';
+
+  const socketOpen = state.ws?.readyState === 1;
+  const pongAgo = state.lastPongAt ? Math.max(0, Math.round((now() - state.lastPongAt) / 1000)) : null;
+  helper.append(
+    createSocketInfoRow(
+      'Проверка WebSocket:',
+      socketOpen ? 'Сокет работает' : state.wsState === 'connecting' ? 'Подключение…' : 'Сокет закрыт',
+      { loading: state.wsState === 'connecting' },
+    ),
+    createSocketInfoRow(
+      'Проверка No Rules:',
+      state.wsAuthenticated ? 'Авторизован' : state.connectionError || 'Нет авторизации',
+      { loading: state.wsState === 'connecting' && !state.wsAuthenticated },
+    ),
+    createSocketInfoRow(
+      'Проверка истории:',
+      state.historyLoading
+        ? 'Загрузка…'
+        : state.historyLoaded
+          ? `Загружена, последние ${Number(state.lastMessageId) || 0}`
+          : 'Не загружена',
+      { loading: state.historyLoading },
+    ),
+    createSocketInfoRow('Очередь отправки:', `${state.outbox.length} сообщений`),
+    createSocketInfoRow('Последний pong:', pongAgo == null ? 'ещё не было' : `${pongAgo} сек назад`),
+    createSocketInfoRow('Переподключений:', String(state.reconnectAttempt || 0)),
+  );
+
+  overlay.append(closer, section);
+  section.append(title, helper);
+  modal.appendChild(overlay);
+  document.body.appendChild(modal);
+
+  const close = (event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    closeSocketDebug();
+  };
+  closer.addEventListener('click', close);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) close(event);
+  });
+  modal.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') close(event);
+  });
+  document.addEventListener('keydown', onSocketDebugKeydown, true);
+  modal.focus();
+}
+
 function ensureSocketIndicator() {
   if (!state.active) return;
   const roomTitle = getChatRoot()?.querySelector('.room-title');
   if (!roomTitle) return;
-  const nativeSocket = roomTitle.querySelector('.chat2-socket-state');
+  // Exclude our own node: querySelector would otherwise select it on the
+  // second pass and hide the indicator we just inserted.
+  const nativeSocket = roomTitle.querySelector('.chat2-socket-state:not(#no-rules-socket)');
   let socket = roomTitle.querySelector('#no-rules-socket');
   if (!socket) {
     socket = document.createElement('div');
@@ -682,10 +808,26 @@ function ensureSocketIndicator() {
     socket.dataset.nrSocket = '1';
     socket.className = state.templates?.socket || `chat2-socket-state ${HASH.footer}`;
     socket.innerHTML = `<div class="${state.templates?.socketInner || HASH.socket}"><span class="socket-disconnected ${HASH.socket}"></span></div>`;
+    socket.setAttribute('role', 'button');
+    socket.setAttribute('tabindex', '0');
+    socket.setAttribute('aria-label', 'Состояние сокета No Rules');
+    socket.style.cursor = 'pointer';
+    socket.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openSocketDebug();
+    });
+    socket.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      event.stopPropagation();
+      openSocketDebug();
+    });
     const titleSpan = roomTitle.querySelector(':scope > span:not(.chat2-socket-state):not(#no-rules-socket)');
     if (titleSpan) titleSpan.after(socket);
     else roomTitle.prepend(socket);
   }
+  socket.style.display = 'block';
   if (nativeSocket) nativeSocket.style.display = 'none';
   els.socket = socket;
   updateSocketIndicator();
@@ -703,6 +845,7 @@ function updateSocketIndicator() {
         ? 'connecting'
         : 'disconnected';
   span.className = `socket-${status} ${HASH.socket}`;
+  socket.dataset.status = status;
   socket.setAttribute(
     'title',
     status === 'connected'
@@ -743,6 +886,7 @@ function updateHeader() {
     if (socket) socket.remove();
     const nativeSocket = roomTitle.querySelector('.chat2-socket-state');
     if (nativeSocket) nativeSocket.style.display = '';
+    closeSocketDebug();
     els.socket = null;
   }
 }
@@ -1148,26 +1292,10 @@ function marketCardFor(href) {
   } else {
     return null;
   }
-  const card = document.createElement('div');
-  card.className = `unfurlContainer shorted marketItem${category ? ` category--${category}` : ''}`;
-  const text = document.createElement('div');
-  text.className = 'text';
-  const icon = document.createElement('span');
-  icon.className = 'SvgIcon';
-  const categoryIcon = document.createElement('span');
-  categoryIcon.className = `categoryIcon ${category} Tooltip`;
-  icon.appendChild(categoryIcon);
-  const label = document.createElement('span');
-  label.className = 'title';
-  label.textContent = title;
-  text.appendChild(icon);
-  text.appendChild(label);
-  const link = document.createElement('a');
-  link.className = 'LinkClicker';
-  link.href = href;
-  card.appendChild(text);
-  card.appendChild(link);
-  return card;
+  return createMarketItemCard(href, {
+    title,
+    extra: { category_name: category },
+  });
 }
 
 
@@ -1238,6 +1366,47 @@ function applyMentionHighlights(root) {
   }
 }
 
+function normalizeUnfurlCards(root) {
+  for (const renderer of [...root.querySelectorAll('.unfurl-renderer')]) {
+    const link = renderer.querySelector('a.unfurl-wrapper.marketItem[href]');
+    if (!link) continue;
+    let url;
+    try {
+      url = new URL(link.getAttribute('href') || '', location.origin);
+    } catch {
+      continue;
+    }
+    if (url.hostname !== 'lzt.market') continue;
+    const categoryClass = [...link.classList].find((name) => name.startsWith('category--'));
+    const category = categoryClass ? categoryClass.slice('category--'.length) : '';
+    const title =
+      renderer.getAttribute('data-title') ||
+      renderer.querySelector('.unfurlMarketTitle')?.textContent?.trim() ||
+      '';
+    if (!title) continue;
+    const rawPrice = renderer.querySelector('.unfurl-price')?.textContent || '';
+    const price = Number(rawPrice.replace(/[^\d,.]/g, '').replace(',', '.'));
+    const card = createMarketItemCard(url.href, {
+      title,
+      extra: {
+        category_name: category,
+        ...(Number.isFinite(price) && price > 0 ? { price } : {}),
+      },
+    });
+    const container = renderer.closest('.node-unfurl') || renderer;
+    const paragraph = container.closest('p');
+    if (
+      paragraph &&
+      paragraph.children.length === 1 &&
+      paragraph.textContent.trim() === container.textContent.trim()
+    ) {
+      paragraph.replaceWith(card);
+    } else {
+      container.replaceWith(card);
+    }
+  }
+}
+
 function enhanceUnfurls(html) {
   const pre = document.createElement('template');
   pre.innerHTML = resolveBbcode(sanitizeClientHtml(html));
@@ -1273,6 +1442,7 @@ function enhanceUnfurls(html) {
       anchor.replaceWith(card);
     }
   }
+  normalizeUnfurlCards(template.content);
   return template.innerHTML;
 }
 
@@ -1859,6 +2029,60 @@ function htmlToBbcode(html) {
       }
     }
     if (tag === 'br') return '\n';
+    if (tag === 'hr') return '[HR]\n';
+    if (element.classList?.contains('CensorSpoiler')) {
+      return `[CENSOR]${[...element.childNodes].map(render).join('')}[/CENSOR]`;
+    }
+    if (element.classList?.contains('bbCodeQuote')) {
+      const quote = element.querySelector('.quote');
+      const author = element.getAttribute('data-author') || '';
+      const inner = [...(quote?.childNodes || [])]
+        .filter((child) => !child.classList?.contains('quoteAuthor'))
+        .map(render)
+        .join('')
+        .trim();
+      return `[QUOTE${author ? `=${author}` : ''}]${inner}[/QUOTE]`;
+    }
+    if (element.classList?.contains('bbCodeSpoilerContainer')) {
+      const target = element.querySelector('.SpoilerTarget');
+      const title = element.querySelector('.SpoilerTitle')?.textContent?.trim() || '';
+      const inner = [...(target?.childNodes || [])].map(render).join('').trim();
+      return `[SPOILER${title ? `=${title}` : ''}]${inner}[/SPOILER]`;
+    }
+    if (tag === 'ul' || tag === 'ol') {
+      const items = [...element.children]
+        .filter((child) => child.tagName === 'LI')
+        .map((child) => `[*]${[...child.childNodes].map(render).join('').trim()}`)
+        .join('\n');
+      return `[LIST${tag === 'ol' ? '=1' : ''}]\n${items}\n[/LIST]`;
+    }
+    if (element.classList?.contains('content--align--center')) {
+      return `[CENTER]${[...element.childNodes].map(render).join('')}[/CENTER]`;
+    }
+    if (element.classList?.contains('content--align--right')) {
+      return `[RIGHT]${[...element.childNodes].map(render).join('')}[/RIGHT]`;
+    }
+    if (element.classList?.contains('content--align--left')) {
+      return `[LEFT]${[...element.childNodes].map(render).join('')}[/LEFT]`;
+    }
+    if (element.classList?.contains('bbCodePlain')) return element.textContent || '';
+    if (element.classList?.contains('bbCodePrice')) {
+      const currency = element.getAttribute('data-price-currency') || 'RUB';
+      const amount = element.getAttribute('data-price-amount') || element.textContent || '';
+      return `[PRICE${currency === 'RUB' ? '' : `=${currency}`}]${amount}[/PRICE]`;
+    }
+    if (tag === 'span') {
+      const style = element.getAttribute('style') || '';
+      const color = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i)?.[1]?.trim();
+      if (color) return `[COLOR=${color}]${[...element.childNodes].map(render).join('')}[/COLOR]`;
+      const size = style.match(/(?:^|;)\s*font-size\s*:\s*(\d+)px/i)?.[1];
+      if (size) {
+        const levels = { 9: 1, 10: 2, 12: 3, 15: 4, 18: 5, 22: 6, 26: 7 };
+        const level = levels[Number(size)];
+        if (level) return `[SIZE=${level}]${[...element.childNodes].map(render).join('')}[/SIZE]`;
+      }
+    }
+    if (tag === 'button') return [...element.childNodes].map(render).join('');
     if (tag === 'img') {
       const alt = element.getAttribute('alt') || '';
       if (element.classList.contains('mceSmilie') && alt) return alt;
@@ -1883,6 +2107,10 @@ function htmlToBbcode(html) {
       const href = absoluteForumUrl(element.getAttribute('href'));
       if (!href) return [...element.childNodes].map(render).join('');
       const text = [...element.childNodes].map(render).join('').trim();
+      if (href.startsWith('mailto:')) return `[EMAIL=${href.slice(7)}]${text || href.slice(7)}[/EMAIL]`;
+      if (element.classList.contains('button') && element.classList.contains('primary')) {
+        return `[BUTTON=${href}]${text || href}[/BUTTON]`;
+      }
       if (!text || text === href) return `[UNFURL="${href}"]${href}[/UNFURL]`;
       return `[URL=${href}]${text}[/URL]`;
     }
