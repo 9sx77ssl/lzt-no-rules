@@ -27,6 +27,27 @@ test('rejects empty messages', () => {
   });
 });
 
+test('enforces the hard 512-character message limit', () => {
+  const accepted = sanitizer.sanitizeMessage(`<p>${'a'.repeat(512)}</p>`);
+  assert.equal(accepted.text.length, 512);
+  assert.throws(
+    () => sanitizer.sanitizeMessage(`<p>${'a'.repeat(513)}</p>`),
+    (error) => error instanceof MessageError && error.code === 'too_long',
+  );
+  // Code points, not UTF-16 units: 512 emoji fit, 513 do not.
+  assert.doesNotThrow(() => sanitizer.sanitizeMessage(`<p>${'😀'.repeat(512)}</p>`));
+  assert.throws(
+    () => sanitizer.sanitizeMessage(`<p>${'😀'.repeat(513)}</p>`),
+    (/** @type {any} */ error) => error.code === 'too_long',
+  );
+  // An environment value cannot raise the hard ceiling.
+  const capped = createSanitizer({ maxMessageText: 10_000 });
+  assert.throws(
+    () => capped.sanitizeMessage(`<p>${'a'.repeat(513)}</p>`),
+    (/** @type {any} */ error) => error.code === 'too_long',
+  );
+});
+
 test('keeps native mentions and avatar images from nztcdn', () => {
   const html =
     '<p>hi <a href="https://lolz.team/members/434343/" class="notranslate username mention" contenteditable="false" translate="no" data-user="434343, mention_user"><img alt="avatar" loading="lazy" class="avatar" src="https://nztcdn.com/avatar/s/1/434343.webp"><span style="color:#ff0076" class="styleUserNickname">mention_user</span></a></p>';

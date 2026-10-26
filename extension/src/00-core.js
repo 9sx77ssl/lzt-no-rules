@@ -40,6 +40,10 @@ const BUILD = {
   roomTitle: 'No Rules',
 };
 
+// The native chat rejects messages longer than this. Keep the composer and the
+// server on the same hard limit so pasted text cannot slip through.
+const MAX_MESSAGE_CHARS = 512;
+
 const STORAGE_KEYS = {
   session: 'lzt.no-rules.session.v1',
   draft: 'lzt.no-rules.draft.v1',
@@ -124,6 +128,13 @@ const state = {
   historyNewerReadyAt: 0,
   suppressScrollLoadUntil: 0,
   scrollPinToken: 0,
+  bottomFollow: true,
+  bottomFollowRaf: null,
+  bottomResizeObserver: null,
+  lastEditorHtml: '',
+  lastEditorLength: 0,
+  limitRestoring: false,
+  limitEditor: null,
   authError: '',
   authFailedPermanently: false,
   templates: null,
@@ -972,6 +983,29 @@ function getEditorText() {
   return getEditorElement()?.innerText || '';
 }
 
+// Count user-perceived characters as Unicode code points (not UTF-16 units),
+// matching PHP/XenForo's mb_strlen-style limit. BBCode that is still text in
+// the editor is counted as typed; rendered media only contributes its alt.
+function messageCharacterCount(value) {
+  return [...String(value ?? '')].length;
+}
+
+function editorLimitText() {
+  const html = getEditorHtml();
+  const fromHtml = extractTextFromHtml(html);
+  const plain = getEditorText();
+  return messageCharacterCount(fromHtml) >= messageCharacterCount(plain) ? fromHtml : plain;
+}
+
+function editorMessageLength() {
+  return messageCharacterCount(editorLimitText());
+}
+
+function syncEditorLimitState() {
+  state.lastEditorHtml = getEditorHtml();
+  state.lastEditorLength = editorMessageLength();
+}
+
 function editorHasMedia() {
   const element = getEditorElement();
   return Boolean(element?.querySelector('img, video'));
@@ -984,31 +1018,45 @@ function editorIsEmpty() {
 }
 
 function clearEditor() {
-  const editor = getTiptap();
-  if (editor) {
-    editor.commands.setContent('');
-    editor.commands.focus();
-    return;
+  const wasRestoring = state.limitRestoring;
+  state.limitRestoring = true;
+  try {
+    const editor = getTiptap();
+    if (editor) {
+      editor.commands.setContent('');
+      editor.commands.focus();
+      return;
+    }
+    const element = getEditorElement();
+    if (!element) return;
+    element.innerHTML = '<p></p>';
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+  } finally {
+    state.limitRestoring = wasRestoring;
+    syncEditorLimitState();
   }
-  const element = getEditorElement();
-  if (!element) return;
-  element.innerHTML = '<p></p>';
-  element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
 }
 
 function setEditorHtml(html) {
-  const editor = getTiptap();
-  if (editor) {
-    editor.commands.setContent(html || '');
-    editor.commands.focus();
+  const wasRestoring = state.limitRestoring;
+  state.limitRestoring = true;
+  try {
+    const editor = getTiptap();
+    if (editor) {
+      editor.commands.setContent(html || '');
+      editor.commands.focus();
+      muteEditorVideos();
+      return;
+    }
+    const element = getEditorElement();
+    if (!element) return;
+    element.innerHTML = html || '<p></p>';
+    element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
     muteEditorVideos();
-    return;
+  } finally {
+    state.limitRestoring = wasRestoring;
+    syncEditorLimitState();
   }
-  const element = getEditorElement();
-  if (!element) return;
-  element.innerHTML = html || '<p></p>';
-  element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
-  muteEditorVideos();
 }
 
 function insertEditorText(text) {
@@ -2211,7 +2259,20 @@ function isNearBottom(threshold = 140) {
 function scrollToBottom(behavior = 'auto') {
   const scroll = getScrollElement();
   if (!scroll) return;
+  state.bottomFollow = true;
   scroll.scrollTo({ top: scroll.scrollHeight, behavior });
+}
+
+function scheduleBottomFollow() {
+  if (state.bottomFollowRaf) return;
+  state.bottomFollowRaf = requestAnimationFrame(() => {
+    state.bottomFollowRaf = null;
+    if (!state.active || !state.bottomFollow) return;
+    const scroll = getScrollElement();
+    if (!scroll) return;
+    const target = Math.max(0, scroll.scrollHeight - scroll.clientHeight);
+    if (Math.abs(scroll.scrollTop - target) > 1) scroll.scrollTop = target;
+  });
 }
 
 function waitFor(selector, timeout = 30_000) {
@@ -2391,6 +2452,9 @@ function debugState() {
     typing: state.typing.size,
     editing: state.editing?.id || null,
     replyTo: state.replyTo?.id || null,
+    editorLength: editorMessageLength(),
+    lastEditorLength: state.lastEditorLength,
+    bottomFollow: state.bottomFollow,
     error: state.connectionError || '',
   };
 }

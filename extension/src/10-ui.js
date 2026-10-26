@@ -38,6 +38,8 @@ const NR_CSS = `
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  padding-bottom: 16px;
+  scroll-padding-bottom: 16px;
   scrollbar-width: thin;
   overscroll-behavior: contain;
 }
@@ -777,6 +779,21 @@ function ensureMessagesContainer() {
   return true;
 }
 
+function observeBottomFollow(container) {
+  if (!container) return;
+  if (!state.bottomResizeObserver) {
+    state.bottomResizeObserver = new ResizeObserver(() => {
+      if (!state.active || !state.bottomFollow) return;
+      scheduleBottomFollow();
+    });
+  }
+  state.bottomResizeObserver.disconnect();
+  for (const child of container.children) state.bottomResizeObserver.observe(child);
+  for (const image of container.querySelectorAll('img')) {
+    if (!image.complete) image.addEventListener('load', scheduleBottomFollow, { once: true });
+  }
+}
+
 function ensureRoomLink() {
   const sideMenu = document.querySelector('.side-menu');
   if (!sideMenu) {
@@ -1487,6 +1504,7 @@ function enforceActiveUI() {
   if (state.active) {
     ensureMessagesContainer();
     ensureRoomLink();
+    bindEditorLimit();
 
     const container = document.getElementById('no-rules-messages');
     hideNativeForRoom();
@@ -1540,6 +1558,7 @@ function attachScrollListener() {
   state.scrollHandler = () => {
     if (!state.active) return;
     if (isNearBottom()) {
+      state.bottomFollow = true;
       if (state.unread > 0) {
         state.unread = 0;
         updateUnreadBadge();
@@ -1567,10 +1586,14 @@ function attachScrollListener() {
     scroll.dataset.nrWheelPin = '1';
     const cancelScrollPin = () => {
       state.scrollPinToken += 1;
+      state.bottomFollow = false;
     };
     scroll.addEventListener('wheel', cancelScrollPin, { passive: true });
     scroll.addEventListener('touchstart', cancelScrollPin, { passive: true });
     scroll.addEventListener('pointerdown', cancelScrollPin, { passive: true });
+    scroll.addEventListener('keydown', (event) => {
+      if (['ArrowUp', 'PageUp', 'Home'].includes(event.key)) state.bottomFollow = false;
+    });
   }
 }
 
@@ -1996,9 +2019,39 @@ function hydrateMarketCards(root) {
   }
 }
 
+function smileyShortcode(image) {
+  if (!image || image.tagName !== 'IMG') return '';
+  if (image.closest('.avatar, .mention, .unfurlContainer, .embed-link')) return '';
+  const alt = String(image.getAttribute('alt') || image.getAttribute('title') || '').trim();
+  return /^:[A-Za-z0-9_+-]+:$/.test(alt) ? alt : '';
+}
+
+function isSmileyImage(image) {
+  if (!image || image.tagName !== 'IMG') return false;
+  if (image.classList.contains('mceSmilie')) return true;
+  if (!smileyShortcode(image)) return false;
+  const src = image.getAttribute('src') || '';
+  try {
+    const host = new URL(src, location.href).hostname;
+    return /(^|\.)nztcdn\.com$/i.test(host);
+  } catch {
+    return false;
+  }
+}
+
 function prepareLightboxImages(root) {
   if (!root) return;
   for (const image of root.querySelectorAll('img')) {
+    if (isSmileyImage(image)) {
+      // Native smileys are not lightbox images. Older messages may already
+      // have an LbTrigger wrapper; unwrap it so the large-smilie CSS applies.
+      const wrapper = image.closest('a.LbTrigger');
+      if (wrapper && wrapper.children.length === 1 && wrapper.parentNode) {
+        wrapper.replaceWith(image);
+      }
+      image.classList.add('mceSmilie');
+      continue;
+    }
     if (image.closest('a, .mention, .avatar, .mceSmilie, .unfurlContainer, .embed-link, [data-lzt-video-player]')) continue;
     const src = image.getAttribute('src') || '';
     if (!/^https?:\/\//i.test(src)) continue;
@@ -2013,7 +2066,10 @@ function prepareLightboxImages(root) {
 }
 
 function applySingleSmilie(root) {
-  const smilies = root.querySelectorAll('.mceSmilie');
+  for (const old of root.querySelectorAll('.mceSmilieLarge')) {
+    old.classList.remove('mceSmilieLarge');
+  }
+  const smilies = [...root.querySelectorAll('img')].filter(isSmileyImage);
   if (smilies.length !== 1) return;
   const onlySmilie = (node) => {
     const meaningful = [...node.childNodes].filter(
@@ -2023,10 +2079,17 @@ function applySingleSmilie(root) {
     );
     if (meaningful.length !== 1) return false;
     const child = meaningful[0];
-    if (child.nodeType === Node.ELEMENT_NODE && child.classList.contains('mceSmilie')) return true;
-    return child.nodeName === 'P' && onlySmilie(child);
+    if (child.nodeType === Node.ELEMENT_NODE && isSmileyImage(child)) return true;
+    if (child.nodeType !== Node.ELEMENT_NODE) return false;
+    const transparentWrapper =
+      child.nodeName === 'P' ||
+      child.classList.contains('svelte-renderer') ||
+      child.classList.contains('LbTrigger');
+    return transparentWrapper && onlySmilie(child);
   };
-  if (onlySmilie(root)) smilies[0].classList.add('mceSmilieLarge');
+  if (onlySmilie(root)) {
+    smilies[0].classList.add('mceSmilie', 'mceSmilieLarge');
+  }
 }
 
 function createMessageElement(message, { showHeader = true } = {}) {
@@ -2537,6 +2600,8 @@ function htmlToBbcode(html) {
     if (tag === 'button') return [...element.childNodes].map(render).join('');
     if (tag === 'img') {
       const alt = element.getAttribute('alt') || '';
+      const shortcode = smileyShortcode(element);
+      if (shortcode) return shortcode;
       if (element.classList.contains('mceSmilie') && alt) return alt;
       if (element.classList.contains('avatar')) return '';
       const src = element.getAttribute('src') || '';
@@ -2690,6 +2755,7 @@ function scrollElementToCenter(element) {
 
 function highlightElement(element) {
   if (!element) return;
+  state.bottomFollow = false;
   element.classList.remove('message-highlight');
   void element.offsetWidth;
   element.classList.add('message-highlight');

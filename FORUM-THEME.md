@@ -5,14 +5,15 @@
 [CENTER][IMG=align=left;alt=%5BIMG%5D]https://nztcdn.com/files/cdbdaf88-5b3f-4546-bda2-cab4fb0d4c4d.webp[/IMG][IMG=align=left;alt=%5BIMG%5D]https://nztcdn.com/files/b5bf1aaf-f6b4-450e-9e34-2f0a1468b28d.webp[/IMG][/CENTER]
 
 [CENTER][SIZE=6][button=https://raw.githubusercontent.com/9sx77ssl/lzt-no-rules/main/extension/dist/no-rules.user.js] УСТАНОВИТЬ [/button][/SIZE]
-[SIZE=2][COLOR=#aaaaaa]Chrome / Edge / Firefox · Tampermonkey или Violentmonkey · 1.2.9[/COLOR][/SIZE][/CENTER]
+[SIZE=2][COLOR=#aaaaaa]Chrome / Edge / Firefox · Tampermonkey или Violentmonkey · 1.3.0[/COLOR][/SIZE][/CENTER]
 
 [SIZE=4][B]Что внутри[/B][/SIZE]
 [LIST]
 [*]Reply с полным HTML, редактирование, удаление
 [*]Фото через fancybox форумный, видео через XenForo-плеер, смайлы как на форуме
 [*]Карточки форума, YouTube, SoundCloud, TikTok, Spotify и [UNFURL='https://lzt.market']lzt.market[/UNFURL]
-[*]BBCode и копирование сообщений в него
+[*]BBCode и копирование сообщений в него; смайлы копируются как `:shortcode:`
+[*]Лимит 512 символов в поле и на сервере, автоскролл к низу после медиа
 [*]История, онлайн текущей румы, typing, unread, мобильный вид и виджет
 [*]Весь джс был переебан и перенесен, свой [tooltip=962]сокет[/tooltip] БЕЗ ЛАГОВ!!!
 [*]Сурсы все на гите, заходим смотрим и хейтим слоп, усилий было приложено мало  :rooster_talk:

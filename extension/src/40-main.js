@@ -58,6 +58,7 @@ function activateRoom({ fromNotification = false } = {}) {
 
   ensureMessagesContainer();
   restoreNoRulesDraft();
+  bindEditorLimit();
   enforceActiveUI();
   renderMessages({ preserveScroll: restoreScroll, forceBottom: !restoreScroll });
   if (restoreScroll) {
@@ -108,6 +109,8 @@ function deactivateRoom({ restoreHeader = true, nativeRoomClick = false } = {}) 
   const scroll = getScrollElement();
   state.roomScrollTop = scroll?.scrollTop || 0;
   state.roomAtBottom = isNearBottom();
+  state.bottomFollow = false;
+  state.bottomResizeObserver?.disconnect();
   state.roomSuspended = true;
   clearTypingState();
   if (state.draftTimer) {
@@ -348,6 +351,10 @@ function onDocumentKeydownCapture(event) {
 function onEditorInputCapture(event) {
   const target = event.target instanceof Element ? event.target : null;
   if (!state.active || !target?.closest('.chat2-footer .tiptap')) return;
+  if (event.isTrusted && !enforceEditorLimit()) {
+    state.draft = getEditorHtml();
+    return;
+  }
   state.draft = getEditorHtml();
   if (state.draftTimer) clearTimeout(state.draftTimer);
   state.draftTimer = setTimeout(() => {
@@ -404,6 +411,7 @@ function installGlobalListeners() {
   document.addEventListener('click', onDocumentClickCapture, true);
   document.addEventListener('keydown', onDocumentKeydownCapture, true);
   document.addEventListener('input', onEditorInputCapture, true);
+  document.addEventListener('paste', onEditorPasteCapture, true);
   window.addEventListener('online', handleWindowOnline);
   window.addEventListener('offline', handleWindowOffline);
   document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -484,6 +492,12 @@ function exposeDebugApi() {
     sanitizeHtml: (html) => sanitizeClientHtml(String(html || '')),
     enhanceHtml: (html) => enhanceUnfurls(String(html || '')),
     bbcodeHtml: (html) => resolveBbcode(String(html || '')),
+    bbcode: (html) => htmlToBbcode(String(html || '')),
+    decorate: (root) => {
+      if (!(root instanceof Element)) return;
+      prepareLightboxImages(root);
+      applySingleSmilie(root);
+    },
     bbcodePlain: (html) => { const t = document.createElement('template'); t.innerHTML = String(html || ''); return bbcodePlainText(t.content); },
     hydrateMentions: (root) => hydrateMentionNodes(root),
     simulateTyping: (username = 'test', id = 999999999) => {

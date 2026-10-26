@@ -146,14 +146,21 @@ function renderMessages({ preserveScroll = false, forceBottom = false } = {}) {
   prepareMessageVideos(container);
   activateNativeContent(container);
   renderTypingInto(container);
+  observeBottomFollow(container);
 
   requestAnimationFrame(() => {
     const scrollElement = getScrollElement();
     if (!scrollElement) return;
     if (forceBottom || (!preserveScroll && wasNearBottom)) {
+      state.bottomFollow = true;
       scrollToBottom('auto');
+      // Images/videos may not have a decoded height yet. Keep following the
+      // bottom while the content grows; a wheel/touch/pointer gesture turns
+      // this off immediately.
+      scheduleBottomFollow();
       return;
     }
+    state.bottomFollow = false;
     if (preserveScroll && previousHeight > 0) {
       const delta = scrollElement.scrollHeight - previousHeight;
       scrollElement.scrollTop = previousTop + Math.max(0, delta);
@@ -557,8 +564,16 @@ async function saveEdit() {
     cancelEdit({ restore: true });
     return;
   }
+  if (!enforceEditorLimit() || editorMessageLength() > MAX_MESSAGE_CHARS) {
+    showComposerError(editorLimitMessage());
+    return;
+  }
   const rawHtml = resolveBbcode(normalizeClientHtml(getEditorHtml()));
   const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
+  if (messageCharacterCount(text) > MAX_MESSAGE_CHARS) {
+    showComposerError(editorLimitMessage());
+    return;
+  }
   let html = rawHtml;
   try {
     html = await resolvePlainUnfurls(rawHtml);
@@ -704,6 +719,63 @@ function editLastOwnMessage() {
   return true;
 }
 
+function editorLimitMessage() {
+  return `Максимум ${MAX_MESSAGE_CHARS} символов.`;
+}
+
+function bindEditorLimit() {
+  const editor = getTiptap();
+  if (!editor || state.limitEditor === editor) return;
+  state.limitEditor = editor;
+  editor.on('update', () => {
+    if (!state.active || state.limitRestoring) return;
+    enforceEditorLimit();
+  });
+}
+
+function enforceEditorLimit() {
+  if (!state.active || state.limitRestoring) return true;
+  const length = editorMessageLength();
+  const previous = Number(state.lastEditorLength) || 0;
+  if (length > MAX_MESSAGE_CHARS && length > previous) {
+    state.limitRestoring = true;
+    try {
+      setEditorHtml(state.lastEditorHtml || '');
+      syncEditorLimitState();
+    } finally {
+      state.limitRestoring = false;
+    }
+    showComposerError(editorLimitMessage());
+    return false;
+  }
+  state.lastEditorHtml = getEditorHtml();
+  state.lastEditorLength = length;
+  return true;
+}
+
+function onEditorPasteCapture(event) {
+  const target = event.target instanceof Element ? event.target : null;
+  if (!state.active || !target?.closest('.chat2-footer .tiptap')) return;
+  const text = event.clipboardData?.getData('text/plain') || '';
+  if (!text) return;
+  const editor = getTiptap();
+  let selected = '';
+  try {
+    const selection = editor?.state?.selection;
+    if (selection) {
+      selected = editor.state.doc.textBetween(selection.from, selection.to, '\n', ' ');
+    }
+  } catch {
+    // Selection can disappear between paste events; fall back to the total.
+  }
+  const nextLength = editorMessageLength() - messageCharacterCount(selected) + messageCharacterCount(text);
+  if (nextLength > MAX_MESSAGE_CHARS) {
+    event.preventDefault();
+    event.stopPropagation();
+    showComposerError(editorLimitMessage());
+  }
+}
+
 async function sendCurrentMessage() {
   if (!state.active) return;
   if (state.editing) {
@@ -717,8 +789,16 @@ async function sendCurrentMessage() {
     showComposerError('Подключение ещё не завершено. Подождите немного.');
     return;
   }
+  if (!enforceEditorLimit() || editorMessageLength() > MAX_MESSAGE_CHARS) {
+    showComposerError(editorLimitMessage());
+    return;
+  }
   const rawHtml = resolveBbcode(normalizeClientHtml(getEditorHtml()));
   const text = getEditorText().trim() || extractTextFromHtml(rawHtml);
+  if (messageCharacterCount(text) > MAX_MESSAGE_CHARS) {
+    showComposerError(editorLimitMessage());
+    return;
+  }
   let html = rawHtml;
   try {
     html = await resolvePlainUnfurls(rawHtml);

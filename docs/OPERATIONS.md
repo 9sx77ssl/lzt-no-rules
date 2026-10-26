@@ -42,7 +42,7 @@ GET /health
 {
   "ok": true,
   "name": "no-rules-chat",
-  "version": "1.2.9",
+  "version": "1.3.0",
   "protocol": 1,
   "uptime": 123,
   "online": 2,
@@ -53,7 +53,7 @@ GET /health
 GET /version
 {
   "name": "no-rules-chat",
-  "version": "1.2.9",
+  "version": "1.3.0",
   "protocol": 1,
   "publicUrl": "wss://lztws.d9v.uk/ws"
 }
@@ -66,7 +66,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 
 ## 3. Протокол
 
-Версия протокола: **1**. Клиент и сервер: **1.2.9**. Транспорт — WebSocket,
+Версия протокола: **1**. Клиент и сервер: **1.3.0**. Транспорт — WebSocket,
 текстовые кадры JSON.
 
 ### Подключение
@@ -75,7 +75,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 2. Сервер присылает `hello`:
 
 ```json
-{"type":"hello","protocol":1,"version":"1.2.9","roomTitle":"No Rules","serverTime":1792946496011}
+{"type":"hello","protocol":1,"version":"1.3.0","roomTitle":"No Rules","serverTime":1792946496011}
 ```
 
 3. Клиент отправляет `auth` (первый вход) или `resume` (есть сессия).
@@ -87,7 +87,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
   "type": "auth",
   "token": "<temporary forum JWT>",
   "accessKey": "<shared extension key>",
-  "clientVersion": "1.2.9"
+  "clientVersion": "1.3.0"
 }
 ```
 
@@ -121,7 +121,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 ### resume
 
 ```json
-{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.2.9"}
+{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.3.0"}
 ```
 
 Ответ такой же `auth.ok`; поле `resumed` есть только в логах сервера.
@@ -199,10 +199,13 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 
 Остальным — `message.new` без `clientId/ack`.
 
-Ограничения: HTML ≤ 12 000, текст ≤ 2 000, кадр ≤ 64 KiB, изображений ≤ 4,
+Ограничения: HTML ≤ 12 000, текст ≤ **512 code points** (жёсткий лимит,
+`MAX_MESSAGE_TEXT` можно только уменьшить), кадр ≤ 64 KiB, изображений ≤ 4,
 ссылок ≤ 5, упоминаний ≤ 8, переводов строк ≤ 30. Внешние картинки по
 умолчанию запрещены (`ALLOW_EXTERNAL_IMAGES=0`), разрешены `nztcdn.com` и
-форумные хосты из allowlist.
+форумные хосты из allowlist. `too_long` возвращается и для `message.send`,
+и для `message.edit`; клиент показывает нативный `.chat2-error`
+«Максимум 512 символов.».
 
 ### Редактирование и удаление
 
@@ -458,7 +461,7 @@ WebSocket-клиенты и уменьшить шум. Настоящая авт
   атрибутов;
 - удаляются `script`, `style`, `iframe`, `object`, `embed`, обработчики
   событий, `javascript:`/`data:` URL, лишние tooltip-атрибуты;
-- лимиты: 12 000 HTML, 2 000 текста, 4 img, 5 ссылок, 8 упоминаний,
+- лимиты: 12 000 HTML, 512 текста (жёстко), 4 img, 5 ссылок, 8 упоминаний,
   30 переводов строк;
 - медиа: `nztcdn.com` + форумные хосты (или `ALLOW_EXTERNAL_IMAGES=1`);
 - poster — только разрешённые URL; spoiler `data-target` ограничен.
@@ -543,7 +546,7 @@ ALLOW_MISSING_ORIGIN=1
 SESSION_TTL_DAYS=30
 MAX_SESSIONS_PER_USER=20
 MAX_MESSAGE_HTML=12000
-MAX_MESSAGE_TEXT=2000
+MAX_MESSAGE_TEXT=512
 MAX_MESSAGE_BYTES=65536
 ALLOW_EXTERNAL_IMAGES=0
 HISTORY_PAGE_SIZE=50
@@ -727,13 +730,13 @@ npm test
 npm run typecheck
 ```
 
-`npm test` — **26/26**: auth, antibot, db, rate limit, sanitize.
+`npm test` — **27/27**: auth, antibot, db, rate limit, sanitize.
 Playwright-сценарии лежат вне репозитория из-за `storageState`.
 
 ### Сборка
 
 ```bash
-NR_VERSION=1.2.9 \
+NR_VERSION=1.3.0 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -891,7 +894,7 @@ DELETE FROM messages WHERE client_id LIKE 'seed-history-%';
 
 ### Чек-лист перед релизом
 
-- [ ] `npm test` — 26/26.
+- [ ] `npm test` — 27/27.
 - [ ] `npm run typecheck`.
 - [ ] `node --check extension/dist/no-rules.user.js`.
 - [ ] Desktop Chromium: все пункты выше.
@@ -941,6 +944,8 @@ production `.env` и реальные ID всё равно не должны п�
 
 Полный архив — [`CHANGELOG.md`](CHANGELOG.md). Ключевые вехи:
 
+- **1.3.0** — жёсткий лимит 512 символов, follow-bottom после загрузки
+  медиа, нативная классификация и копирование смайлов, 27 unit-тестов.
 - **1.2.9** — typed `mountNativeModal`, плавные online/socket-модалки,
   исправлена `rise`-анимация ПКМ.
 - **1.2.8** — нативная онлайн-модалка с backdrop/body-lock.

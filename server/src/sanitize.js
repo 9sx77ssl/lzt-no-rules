@@ -65,6 +65,10 @@ export function isAllowedMediaUrl(value, { allowExternalImages = false } = {}) {
   return hostAllowed(url.hostname, MEDIA_HOSTS);
 }
 
+export function characterCount(value) {
+  return [...String(value ?? '')].length;
+}
+
 export function extractText(html) {
   const $ = cheerio.load(String(html ?? ''), null, false);
   $('a.mention, span.mention').each((_, element) => {
@@ -451,10 +455,14 @@ function sanitizeMessageClasses(html) {
   return $.html();
 }
 
+export const HARD_MAX_MESSAGE_TEXT = 512;
+
 export function createSanitizer(options = {}) {
   const allowExternalImages = options.allowExternalImages === true;
   const maxHtml = options.maxMessageHtml ?? 12_000;
-  const maxText = options.maxMessageText ?? 2_000;
+  // The native chat's hard ceiling. Environment values may lower it for a
+  // deployment, but never raise it past 512 characters.
+  const maxText = Math.min(options.maxMessageText ?? HARD_MAX_MESSAGE_TEXT, HARD_MAX_MESSAGE_TEXT);
   const maxImages = options.maxImagesPerMessage ?? 4;
   const maxLinks = options.maxLinksPerMessage ?? 5;
   const maxMentions = options.maxMentionsPerMessage ?? 8;
@@ -685,8 +693,8 @@ export function createSanitizer(options = {}) {
     const mentionCount = $('a.mention, span.mention, a.username.mention').length;
     const text = extractText(sanitized);
 
-    if (text.length > maxText) {
-      throw new MessageError('too_long', 'Сообщение слишком длинное');
+    if (characterCount(text) > maxText) {
+      throw new MessageError('too_long', `Максимум ${maxText} символов`);
     }
     if (imageCount > maxImages) {
       throw new MessageError('too_many_images', `Не более ${maxImages} изображений в сообщении`);

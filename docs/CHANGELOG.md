@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.0
+
+- Жёсткий лимит **512 Unicode code points** для composer-а, `message.send` и
+  `message.edit`; вставка, IME и drag-drop не обходят ограничение. Сервер
+  дополнительно clamp-ит `MAX_MESSAGE_TEXT` сверху.
+- Автоскролл удерживает низ после поздней загрузки фото/видео/unfurl и
+  изменения typing; нижний отступ 16 px от composer-а. Ручной скролл
+  отключает follow.
+- Соло-смайлы (webp/svg/`alt=:shortcode:`) больше не оборачиваются в
+  lightbox, получают нативный `mceSmilieLarge` 96×96 и копируются как
+  `:shortcode:`; обычные фото по-прежнему копируются как `[IMG]...`.
+- Добавлен unit-тест на 512 code points, включая emoji и clamp env.
+- Сервер и extension: `1.3.0`.
+
 ## 1.2.9
 
 - Контекстное меню ПКМ теперь реально анимируется как нативная `rise`:

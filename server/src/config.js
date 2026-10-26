@@ -52,7 +52,7 @@ const config = {
   publicUrl: process.env.PUBLIC_URL || 'wss://lztws.d9v.uk/ws',
   tlsKeyPath: process.env.TLS_KEY_PATH || '',
   tlsCertPath: process.env.TLS_CERT_PATH || '',
-  version: process.env.SERVER_VERSION || '1.2.9',
+  version: process.env.SERVER_VERSION || '1.3.0',
   roomTitle: process.env.ROOM_TITLE || 'No Rules',
 
   dbPath: process.env.DB_PATH || fileURLToPath(new URL('../data/no-rules.db', import.meta.url)),
@@ -78,7 +78,7 @@ const config = {
   maxSessionsPerUser: int(process.env.MAX_SESSIONS_PER_USER, 20),
 
   maxMessageHtml: int(process.env.MAX_MESSAGE_HTML, 12_000),
-  maxMessageText: int(process.env.MAX_MESSAGE_TEXT, 2_000),
+  maxMessageText: int(process.env.MAX_MESSAGE_TEXT, 512),
   maxMessageBytes: int(process.env.MAX_MESSAGE_BYTES, 64 * 1024),
   maxImagesPerMessage: int(process.env.MAX_IMAGES_PER_MESSAGE, 4),
   maxLinksPerMessage: int(process.env.MAX_LINKS_PER_MESSAGE, 5),
