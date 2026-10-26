@@ -10,6 +10,7 @@
 // @match        https://zelenka.guru/*
 // @run-at       document-start
 // @grant        none
+// @unwrap
 // @noframes
 // @homepageURL  https://lolz.team/gay1234
 // @supportURL   https://lolz.team/gay1234

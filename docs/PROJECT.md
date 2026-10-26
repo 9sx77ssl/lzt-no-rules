@@ -30,7 +30,7 @@ scripts/
 Сборка склеивает модули в один IIFE в фиксированном порядке:
 
 ```bash
-NR_VERSION=1.3.5 \
+NR_VERSION=1.3.6 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -488,7 +488,10 @@ WebSocket/сессия остаются, а `ensureRoomLink` возвращае�
 
 ## 11. Firefox и Tampermonkey
 
-- `PAGE_WINDOW` = `unsafeWindow` с fallback на `window`;
+- `PAGE_WINDOW` = `unsafeWindow` с fallback на `window`; заголовок содержит
+  `@unwrap`, чтобы Tiptap оставался доступен в Firefox;
+- `getTiptap()` дополнительно смотрит `element.wrappedJSObject.editor` и
+  page-window; если API всё же закрыт, DOM-fallback ставит каретку в конец;
 - auth/fetch URL — абсолютная строка;
 - не передавать `URL` в форумный `fetch` (патч форума ждёт строку);
 - `@grant none`; для `XenForo.activate` нужен page-context;

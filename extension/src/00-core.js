@@ -968,8 +968,33 @@ function getEditorElement() {
 
 function getTiptap() {
   const element = getEditorElement();
-  const editor = element?.editor;
-  return editor && typeof editor.getHTML === 'function' ? editor : null;
+  if (!element) return null;
+  const candidates = [];
+  try { candidates.push(element.editor); } catch { /* Xray/expando */ }
+  try { candidates.push(element.wrappedJSObject?.editor); } catch { /* Xray/expando */ }
+  try {
+    const pageDocument = PAGE_WINDOW?.document;
+    const pageElement = pageDocument?.querySelector('.chat2-footer .tiptap');
+    if (pageElement && pageElement !== element) candidates.push(pageElement.editor);
+  } catch { /* ignore */ }
+  return candidates.find((editor) => editor && typeof editor.getHTML === 'function') || null;
+}
+
+function placeCaretAtEnd(element) {
+  if (!element) return;
+  try { element.focus({ preventScroll: true }); } catch { /* ignore */ }
+  try {
+    const selection = PAGE_WINDOW?.getSelection?.() || window.getSelection?.();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  } catch {
+    // ProseMirror owns the selection; the editor API path handles this when
+    // the page-context editor is available.
+  }
 }
 
 function getEditorHtml() {
@@ -1070,6 +1095,7 @@ function clearEditor() {
     if (!element) return;
     element.innerHTML = '<p></p>';
     element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+    placeCaretAtEnd(element);
   } finally {
     state.limitRestoring = wasRestoring;
     syncEditorLimitState();
@@ -1093,6 +1119,7 @@ function setEditorHtml(html) {
     element.innerHTML = html || '<p></p>';
     element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
     muteEditorVideos();
+    placeCaretAtEnd(element);
   } finally {
     state.limitRestoring = wasRestoring;
     syncEditorLimitState();

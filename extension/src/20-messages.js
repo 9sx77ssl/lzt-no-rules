@@ -521,7 +521,7 @@ function startEdit(message) {
   renderEditBar();
   const editor = getTiptap();
   if (editor) editor.commands.focus('end');
-  else getEditorElement()?.focus();
+  else placeCaretAtEnd(getEditorElement());
   document.querySelector('.chat2-footer')?.scrollIntoView({ block: 'end' });
 }
 

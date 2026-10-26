@@ -8,7 +8,7 @@ Tiptap, reply/edit-бары, контекстное меню и мобильны
 - Репозиторий: <https://github.com/9sx77ssl/lzt-no-rules>
 - WSS: `wss://lztws.d9v.uk/ws`
 - Health: <https://lztws.d9v.uk/health> · Version: <https://lztws.d9v.uk/version>
-- Версия: **1.3.5**
+- Версия: **1.3.6**
 
 > Это не E2E. Сообщения хранятся в SQLite у владельца сервера. Пароль,
 > cookies форума и платёжные данные на backend не отправляются.
@@ -34,6 +34,8 @@ Tiptap, reply/edit-бары, контекстное меню и мобильны
   96×96 и копируется как `:shortcode:`.
 - В редакторе смайлы всегда 32×32, после отправки не остаются NodeView,
   а при редактировании курсор сразу ставится в конец сообщения.
+- Firefox/Tampermonkey: `@unwrap` и доступ к Tiptap через `wrappedJSObject`;
+  курсор в конце и очистка работают и из userscript-sandbox.
 - Один typed-хелпер `mountNativeModal` для онлайн-списка и отладки сокета:
   backdrop, блокировка body, плавное открытие/закрытие, X, клик вне, Escape.
 - Контекстное меню повторяет нативную `rise`-анимацию: 100 мс, fade +
@@ -117,7 +119,7 @@ bun run start
 ## Сборка и релиз
 
 ```bash
-NR_VERSION=1.3.5 \
+NR_VERSION=1.3.6 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs

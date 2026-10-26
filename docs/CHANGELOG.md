@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.6
+
+- Firefox/Tampermonkey: добавлен `@unwrap`, поиск Tiptap через
+  `element.wrappedJSObject.editor` и page-window fallback.
+- Если Tiptap API недоступен из sandbox, DOM-fallback ставит каретку в конец;
+  это исправляет курсор слева от текста и остатки NodeView в Firefox.
+- Сервер и extension: `1.3.6`.
+
 ## 1.3.5
 
 - После очистки composer-а удаляются осиротевшие Tiptap NodeView-обёртки
