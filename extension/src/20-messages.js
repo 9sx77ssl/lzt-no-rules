@@ -154,7 +154,7 @@ function renderTypingInto(container) {
     container.appendChild(typing);
   }
   const users = [...state.typing.values()]
-    .filter((entry) => entry && entry.user?.id !== state.user?.id && now() - entry.at < 5000)
+    .filter((entry) => entry && entry.user?.id !== state.user?.id && now() - entry.at < 3000)
     .map((entry) => entry.user)
     .filter((user) => user?.username);
   const spinner = typing.querySelector('.lztui-spinner-wrapper');
@@ -182,7 +182,9 @@ function renderTypingInto(container) {
 function renderTypingOnly() {
   const container = els.messages || document.getElementById('no-rules-messages');
   if (!container) return;
+  const wasNearBottom = isNearBottom();
   renderTypingInto(container);
+  if (wasNearBottom) scrollToBottom('auto');
 }
 
 function markTyping(user) {
@@ -197,11 +199,14 @@ function markTyping(user) {
     at: now(),
     timer: null,
   };
+  // Native chat re-inserts the user on every typing packet, so the most
+  // recently active person is shown first; the same user never duplicates.
+  state.typing.delete(user.id);
+  state.typing.set(user.id, entry);
   entry.timer = setTimeout(() => {
     state.typing.delete(user.id);
     renderTypingOnly();
-  }, 4500);
-  state.typing.set(user.id, entry);
+  }, 3000);
   renderTypingOnly();
 }
 
@@ -362,6 +367,29 @@ function handleIncomingDelete(payload) {
   }
 }
 
+function focusComposer() {
+  const apply = () => {
+    if (!state.active) return;
+    const editor = getTiptap();
+    const element = getEditorElement();
+    try {
+      if (editor && !editor.isDestroyed) editor.commands.focus();
+    } catch {
+      // fall through to the DOM focus below
+    }
+    try {
+      if (element && document.activeElement !== element) element.focus({ preventScroll: true });
+    } catch {
+      // ignore focus errors from a detached composer
+    }
+  };
+  // A pointerdown on the avatar/menu can steal focus back after the click
+  // handler. Focus now and once more after the browser finishes the gesture.
+  apply();
+  requestAnimationFrame(apply);
+  setTimeout(apply, 35);
+}
+
 function startReply(message) {
   if (!state.active || !message || message.deleted || message.pending) return;
   if (state.editing) {
@@ -375,14 +403,14 @@ function startReply(message) {
     html: message.html || '',
   };
   renderReplyBar();
-  getTiptap()?.commands.focus();
+  focusComposer();
 }
 
 function cancelReply() {
   if (!state.replyTo) return;
   state.replyTo = null;
   document.getElementById('no-rules-reply')?.remove();
-  getTiptap()?.commands.focus();
+  focusComposer();
 }
 
 function renderReplyBar() {

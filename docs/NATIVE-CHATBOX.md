@@ -339,7 +339,7 @@ Plain `@nick` не является Tiptap-нодой. При отправке N
   (`url.startsWith`), поэтому передаётся **строка**.
 - `XenForo.activate` берётся через `PAGE_WINDOW`/`unsafeWindow`.
 - Firefox/Tampermonkey content-script WebSocket может прислать
-  `Origin: null`. Сервер с 1.1.19+ (сейчас 1.2.3) трактует его как missing origin
+  `Origin: null`. Сервер с 1.1.19+ (сейчас 1.2.4) трактует его как missing origin
   (`ALLOW_MISSING_ORIGIN`), иначе handshake падал с 403 и в UI было
   «Онлайн: 0».
 - В Tampermonkey не должно быть двух копий No Rules: старые
@@ -373,3 +373,19 @@ Plain `@nick` не является Tiptap-нодой. При отправке N
 7. Firefox/Tampermonkey.
 8. Копирование текста в BBCode.
 9. Отсутствие `pageerror`.
+
+## 13. Анимации и typing
+
+- Новое сообщение в нативном Chatbox входит Svelte `fly` с `x: -20`:
+  400 мс, `cubicOut`, прозрачность 0 → 1. No Rules повторяет это CSS-
+  анимацией `nr-message-in`; pending и реальное сообщение входят одинаково.
+- Контекстное меню нативного чата использует `rise` с `duration: 100`:
+  прозрачность 0 → 1 и `translateY(10px)` → 0. No Rules применяет
+  `nr-menu-enter` / `nr-menu-in` / `nr-menu-leave`; закрытие по клику вне,
+  Escape и скроллу тоже анимируется.
+- Typing-фразы берутся из `XenForo.phrases`:
+  - один: `{{user}} печатает`;
+  - два: `{{user1}} и {{user2}} печатают`;
+  - больше: `{{user1}} и еще {{count}} печатают`.
+  Пользователь живёт в typing 3000 мс; каждое новое событие переставляет его
+  в конец, как нативный `Ie` + `tt` в `chat2.js`.

@@ -15,7 +15,7 @@ sanitize. Playwright-сценарии лежат вне репозитория �
 ## 2. Сборка
 
 ```bash
-NR_VERSION=1.2.3 \
+NR_VERSION=1.2.4 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -251,6 +251,10 @@ DELETE FROM messages WHERE client_id LIKE 'seed-history-%';
 - [ ] Ошибка отправки: bubble плавно исчезает, красной обводки/«Повторить» нет, нативный `.chat2-error` живёт 3 с.
 - [ ] Пустой Enter → «Пожалуйста, введите корректное сообщение.»
 - [ ] Переход к reply: нативная `.message-highlight`, без зелёной обводки; старое сообщение грузится окном `history near`.
+- [ ] Reply из аватара и контекстного меню сразу фокусирует `.tiptap`.
+- [ ] Новое сообщение входит `nr-message-in` 400 мс / x -20 px, pending тоже.
+- [ ] Контекстное меню входит/выходит `rise` 100 мс, Escape/клик вне закрывают плавно.
+- [ ] Typing: 1 — «ник печатает», 2 — «ник и ник печатают», 10 — «ник и еще 9 печатают»; исчезает за 3 с.
 
 ### Safety / polish
 

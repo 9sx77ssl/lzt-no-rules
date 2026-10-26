@@ -486,9 +486,9 @@ function exposeDebugApi() {
     bbcodeHtml: (html) => resolveBbcode(String(html || '')),
     bbcodePlain: (html) => { const t = document.createElement('template'); t.innerHTML = String(html || ''); return bbcodePlainText(t.content); },
     hydrateMentions: (root) => hydrateMentionNodes(root),
-    simulateTyping: (username = 'test') => {
+    simulateTyping: (username = 'test', id = 999999999) => {
       if (!state.active) activateRoom();
-      markTyping({ id: 999999999, username: String(username || 'test').slice(0, 32) });
+      markTyping({ id: Number(id) || 999999999, username: String(username || 'test').slice(0, 32) });
       renderTypingOnly();
     },
     send: (text, { html = false } = {}) => {

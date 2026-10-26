@@ -51,8 +51,40 @@ const NR_CSS = `
 }
 #no-rules-messages .nr-loading-top i { margin-right: 6px; }
 #no-rules-messages .nr-message-pending {
+  --nr-message-opacity: .68;
   opacity: .68;
   transition: opacity .2s ease, transform .2s ease;
+}
+#no-rules-messages .nr-message-enter {
+  animation: nr-message-in .4s cubic-bezier(.215, .61, .355, 1) both;
+}
+@keyframes nr-message-in {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: var(--nr-message-opacity, 1); transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #no-rules-messages .nr-message-enter { animation: none; }
+}
+.message-actions.nr-menu-enter,
+.message-actions.nr-menu-enter .menu {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .1s linear, transform .1s linear;
+}
+.message-actions.nr-menu-in,
+.message-actions.nr-menu-in .menu {
+  opacity: 1;
+  transform: translateY(0);
+}
+.message-actions.nr-menu-leave,
+.message-actions.nr-menu-leave .menu {
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .message-actions.nr-menu-enter,
+  .message-actions.nr-menu-enter .menu { transition: none; }
 }
 #no-rules-messages .nr-message-failed-out {
   opacity: 0;
@@ -1837,6 +1869,7 @@ function createMessageElement(message, { showHeader = true } = {}) {
   wrapper.dataset.nrMessage = '1';
   wrapper.className = state.templates?.messageBase || `chat2-message ${HASH.message}`;
   wrapper.classList.add(...messageStyleClass(message).split(/\s+/).filter(Boolean));
+  wrapper.classList.add('nr-message-enter');
   if (message.pending) wrapper.classList.add('nr-message-pending', 'chat2-message-pending');
   if (message.deleting) wrapper.classList.add('nr-message-deleting');
   if (message.deleted) wrapper.classList.add('nr-message-deleted');
@@ -2103,11 +2136,11 @@ function installTouchGestures(container) {
 }
 
 function openMessageMenu(message, x, y, target = null) {
-  closeMenu();
+  closeMenu({ animate: false, immediate: true });
   if (!message) return;
 
   const menu = document.createElement('div');
-  menu.className = `message-actions ${HASH.menu}`;
+  menu.className = `message-actions ${HASH.menu} nr-menu-enter`;
   menu.dataset.nrMenu = '1';
   menu.style.position = 'fixed';
   menu.style.zIndex = '10000';
@@ -2167,6 +2200,11 @@ function openMessageMenu(message, x, y, target = null) {
   document.body.appendChild(menu);
   positionMenu(menu, x, y);
   state.menuEl = menu;
+  requestAnimationFrame(() => {
+    if (state.menuEl !== menu) return;
+    menu.classList.remove('nr-menu-enter');
+    menu.classList.add('nr-menu-in');
+  });
 
   setTimeout(() => {
     document.addEventListener('pointerdown', closeMenuFromOutside, true);
@@ -2203,10 +2241,18 @@ function positionMenu(menu, x, y) {
   menu.style.top = `${top}px`;
 }
 
-function closeMenu() {
+function closeMenu({ animate = true, immediate = false } = {}) {
   const menu = state.menuEl;
   state.menuEl = null;
-  if (menu) menu.remove();
+  if (menu) {
+    if (!animate || immediate) {
+      menu.remove();
+    } else {
+      menu.classList.remove('nr-menu-in', 'nr-menu-enter');
+      menu.classList.add('nr-menu-leave');
+      setTimeout(() => menu.remove(), 110);
+    }
+  }
   document.removeEventListener('pointerdown', closeMenuFromOutside, true);
   document.removeEventListener('keydown', onMenuKeydown, true);
   window.removeEventListener('resize', closeMenu);
