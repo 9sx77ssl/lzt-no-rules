@@ -11,7 +11,7 @@ cd server
 bun install
 cd ..
 
-NR_VERSION=1.1.23 \
+NR_VERSION=1.1.24 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.24
+
+- Socket modal now closes on Escape even when focus escapes the dialog; close
+  animation and backdrop behaviour are unchanged.
+- Server and extension: `1.1.24`.
+
 ## 1.1.23
 
 - Permission-only BBCode (`CLUB`, `DAYS`, `LIKES`, `LIKES2`, `USERIDS`, `API`,

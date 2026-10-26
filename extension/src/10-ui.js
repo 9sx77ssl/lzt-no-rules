@@ -796,6 +796,7 @@ function closeSocketDebug(immediate = false) {
     state.socketProbe = null;
   }
   document.removeEventListener('keydown', onSocketDebugKeydown, true);
+  window.removeEventListener('keydown', onSocketDebugKeydown, true);
   document.body.classList.remove('nr-socket-modal-open');
   if (!modal) {
     backdrop?.remove();
@@ -924,6 +925,7 @@ function openSocketDebug() {
     if (event.key === 'Escape') close(event);
   });
   document.addEventListener('keydown', onSocketDebugKeydown, true);
+  window.addEventListener('keydown', onSocketDebugKeydown, true);
   modal.focus();
   probeSocketConnection(probeRow);
 }
