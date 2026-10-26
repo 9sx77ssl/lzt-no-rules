@@ -11,7 +11,7 @@ cd server
 bun install
 cd ..
 
-NR_VERSION=1.1.24 \
+NR_VERSION=1.1.25 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -264,12 +264,10 @@ document-start
 `resolveBbcode`:
 
 - парсит plain-text блоки Tiptap целиком, включая переносы `<br>`;
-- поддерживает `[B/I/U/S]`, `[COLOR]`, `[SIZE]`, `[URL]`, `[EMAIL]`,
-  `[IMG]`, `[MEDIA]`, `[VIDEO]`, `[UNFURL]`, `[USER]`, `[LIST]`+`[*]`,
-  `[LEFT/CENTER/RIGHT]`, `[QUOTE=author]`, `[SPOILER=title]`,
-  `[CODE/PHP/HTML/SRC]`, `[PLAIN]`, `[PRICE]`, `[BUTTON]`, `[HR]`;
-- одинаковые вложенные теги закрываются по балансу, а не по первому
-  `[/tag]`;
+- оставляет рабочими только `[URL]`, `[IMG]`, `[MEDIA]`, `[VIDEO]` и
+  `[UNFURL]`;
+- остальные теги снимает, сохраняя текст; permission-only теги превращает
+  в muted-заглушку;
 - вызывается при отправке и при рендере старых сообщений.
 
 `normalizeClientHtml` убирает Tiptap-хвосты (`ProseMirror-widget`, лишний
@@ -307,8 +305,9 @@ reconnect и отдельным тестовым WebSocket-подключени�
 - `[IMG]...[/IMG]`;
 - `[URL=...]...[/URL]`;
 - `[USER=id]@nick[/USER]`;
-- `[B]`, `[I]`, `[U]`, `[S]`, `[CODE]`, `[QUOTE]`;
 - plain text — как есть.
+- Форматирование вроде `[B]`, `[COLOR]`, `[QUOTE]`, `[LIST]` в новых
+  сообщениях снимается в plain; старые HTML-сообщения не переписываются.
 
 Копирование не показывает toast; ошибки только `console.debug`.
 

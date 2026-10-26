@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.25
+
+- Чат намеренно оставлен на BBCode, который реально работает: `URL`, `IMG`,
+  `MEDIA`, `VIDEO`, `UNFURL`. Остальные теги снимаются в plain-текст, чтобы
+  не показывать квадратные скобки и не ломать реальные сообщения.
+- Permission-only BBCode остаётся безопасной muted-заглушкой.
+- Сервер и extension: `1.1.25`.
+
 ## 1.1.24
 
 - Socket modal now closes on Escape even when focus escapes the dialog; close

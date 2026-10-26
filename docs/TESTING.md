@@ -15,7 +15,7 @@ sanitize. Playwright-сценарии лежат вне репозитория �
 ## 2. Сборка
 
 ```bash
-NR_VERSION=1.1.24 \
+NR_VERSION=1.1.25 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 bun scripts/build-extension.mjs
@@ -207,7 +207,7 @@ DELETE FROM messages WHERE client_id LIKE 'seed-history-%';
 - [ ] Прямой `#no-rules`, reload, reconnect, offline outbox.
 - [ ] История > 60, позиция скролла, отсутствие дублей.
 - [ ] Market-карточка 24 px, без лишнего `<br>`/`ProseMirror-widget`.
-- [ ] BBCode: quote/spoiler/list/center/color/size + F5.
+- [ ] BBCode: URL/IMG/MEDIA/VIDEO/UNFURL; остальные теги → plain, без скобок.
 - [ ] Клик по socket-индикатору открывает native debug-модалку.
 - [ ] Native room → No Rules: пункт меню возвращается, скролл сохраняется.
 - [ ] `https://lztws.d9v.uk/health` и `/version`.
@@ -245,7 +245,7 @@ DELETE FROM messages WHERE client_id LIKE 'seed-history-%';
 - [ ] `https://lzt.market/266223421/` → account block with icon/title/price.
 - [ ] `[UNFURL="..."]...[/UNFURL]` → same block.
 - [ ] `[MEDIA=youtube]...[/MEDIA]` → correct embed (not malformed link).
-- [ ] `[B]/[I]/[URL=...]` render and copy as BBCode.
+- [ ] `[URL]`, `[IMG]`, `[MEDIA]`, `[UNFURL]` render; `[B]/[COLOR]/[QUOTE]` остаются plain.
 
 ### Safety / polish
 

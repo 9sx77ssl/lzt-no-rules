@@ -1,93 +1,60 @@
 # BBCode
 
-BBCode разбирается дважды:
-
-1. перед отправкой — `resolveBbcode(normalizeClientHtml(getEditorHtml()))`;
-2. при рендере — `enhanceUnfurls()` для старых сообщений и после F5.
-
-Теги регистронезависимы. Неизвестные теги остаются текстом.
-
-## Что поддерживается
+В чате поддерживается только то, что реально работает в сообщениях:
 
 | BBCode | Результат |
 |---|---|
-| `[B]`, `[I]`, `[U]`, `[S]` | нативное форматирование |
-| `[COLOR=red]`, `[COLOR=#ff0000]` | цвет |
-| `[SIZE=1..7]`, `[SIZE=+1]` | размер XenForo: 9–26 px |
-| `[URL]`, `[URL=...]`, `[EMAIL]`, `[EMAIL=...]` | ссылка / `mailto:` |
-| `[USER=id]ник[/USER]` | mention-блок |
-| `[IMG]...[/IMG]` | `a.LbTrigger > img.bbCodeImage.LbImage` |
-| `[MEDIA=youtube|soundcloud]...[/MEDIA]` | `.embed-link` карточка |
-| `[VIDEO]...[/VIDEO]` | HTML5 video |
-| `[UNFURL="url"]url[/UNFURL]` | market/forum unfurl |
-| `[LIST]` / `[LIST=1]` + `[*]` | `ul` / `ol` |
-| `[LEFT]`, `[CENTER]`, `[RIGHT]` | `div.content--align--*` |
-| `[QUOTE]`, `[QUOTE=author]` | `div.bbCodeBlock.bbCodeQuote` |
-| `[SPOILER]`, `[SPOILER=title]` | нативная кнопка + `.SpoilerTarget` |
-| `[CODE]`, `[PHP]`, `[HTML]`, `[SRC]` | `pre > code` |
-| `[PLAIN]` | текст без разбора BBCode |
-| `[PRICE]`, `[PRICE=USD]` | `.bbCodePrice` |
-| `[BUTTON=url]текст[/BUTTON]` | `a.button.primary` |
-| `[HR]` | горизонтальная линия |
+| `[URL]...[/URL]` | ссылка |
+| `[URL=...]текст[/URL]` | ссылка с текстом |
+| `[IMG]https://...[/IMG]` | фото + fancybox |
+| `[MEDIA=youtube]...[/MEDIA]` | media-карточка |
+| `[VIDEO]https://...[/VIDEO]` | HTML5 video |
+| `[UNFURL="..."]...[/UNFURL]` | market/forum карточка |
 
-Вложенные одинаковые теги, `br` внутри блоков, кавычки и атрибуты без
-кавычек поддерживаются. Списки и блоки, набранные через переносы строк,
-разбираются как один текстовый блок.
+Всё остальное (`B`, `I`, `U`, `S`, `COLOR`, `SIZE`, `CENTER`, `LEFT`,
+`RIGHT`, `QUOTE`, `LIST`, `EMAIL`, `SPOILER`, `CODE`, `PHP`, `HTML`, `SRC`,
+`PLAIN`, `PRICE`, `BUTTON`, `HR`) в чате **не форматируется**: теги
+снимаются, текст остаётся обычным. Например, `[COLOR=#aaa]текст[/COLOR]`
+показывается как `текст`, без цвета и без квадратных скобок.
 
-## Почему не оригинальный JS-парсер
+Теги, зависящие от прав форума (`CLUB`, `DAYS`, `EXCEPTIDS`, `LANG`,
+`LIKES`, `LIKES2`, `USERIDS`, `API`, `TOOLTIP`, `VISITOR`, `CENSOR`),
+показываются как muted-плашка «Скрытый контент форума недоступен». Их
+содержимое не раскрывается.
 
-В сохранённых чанках `chat2.js`, `xenforo-*.js` и `tiptap-vendor-*.js` нет
-клиентского XenForo BBCode-парсера: форум рендерит BBCode на PHP и отдаёт
-уже готовый HTML. Публичного `/editor/convert` нет — проверка дала 404.
+## Где это применяется
 
-Проверены editor-роуты форума:
+1. Перед отправкой: `resolveBbcode(normalizeClientHtml(getEditorHtml()))`.
+2. При рендере старых сообщений и после F5: `enhanceUnfurls()`.
 
-- `POST /editor/to-html` с полем `bbCode` действительно разбирает BBCode,
-  но отдаёт **editor HTML** без нативных message-классов. Для `[CLUB]` и
-  `[LIKES]` он возвращает скрытый текст в HTML, а `[API]`, `[PRICE]`,
-  `[BUTTON]`, `[MEDIA]`, `[HR]` оставляет literal-тегами.
-- `POST /editor/to-bb-code` с полем `html` возвращает `[B]...[/B]`; это
-  можно использовать как fallback для copy, но обычное копирование уже
-  работает локально без лишнего запроса.
+Tiptap может разбивать ввод на несколько `<p>`/`<br>`; plain-блок
+собирается в одну строку перед разбором. После разбора убираются trailing
+`<br>`/пустые `<p>`, чтобы сообщение не получало лишнюю строку.
 
-Поэтому для рендера используется локальный parser с безопасными
-placeholder-ами для permission-only тегов, а не `/editor/to-html`.
+## Почему не `/editor/to-html`
 
-## Где parser не равен PHP-парсеру форума
+Роуты форума проверены:
 
-XenForo рендерит BBCode на сервере. Клиентский userscript не может честно
-повторить теги, которые зависят от прав пользователя:
+- `POST /editor/to-html` с полем `bbCode` разбирает BBCode, но отдаёт
+  editor HTML без нативных классов и **возвращает скрытый текст** для
+  `CLUB`/`LIKES`; `API`, `PRICE`, `BUTTON`, `MEDIA`, `HR` оставляет
+  literal-тегами.
+- `POST /editor/to-bb-code` с полем `html` возвращает `bbCode`; это можно
+  использовать как fallback для копирования, но обычный `htmlToBbcode`
+  уже работает локально без лишнего запроса.
 
-`[CLUB]`, `[DAYS]`, `[EXCEPTIDS]`, `[LANG]`, `[LIKES]`, `[LIKES2]`,
-`[USERIDS]`, `[API]`, `[TOOLTIP]`, `[VISITOR]`.
+Поэтому парсер локальный и намеренно ограничен поддерживаемыми тегами.
 
-Они показываются как muted-плашка «Скрытый контент форума недоступен»:
-контент не раскрывается и запросы от имени пользователя не делаются.
-`[CENSOR]` отображается как `div.CensorSpoiler`.
+## Карточки
 
-## Нативные карточки
+- Market-раздел: `.unfurlContainer.shorted.marketItem`, высота 24 px.
+- Tiptap `market_search` при рендере приводится к этой же legacy-карточке.
+- Форумный раздел: `.forum-wrapper`.
+- Фото: `.LbTrigger` + fancybox.
+- Media: `.embed-link`; metadata market — через `/editor/unfurl`.
 
-- Market/раздел: `.unfurlContainer.shorted.marketItem` с `categoryIcon`,
-  `.title`, `.price` и `.LinkClicker`; высота 24 px, как в живом Chatbox.
-- Tiptap-карточка `market_search` при рендере приводится к этой же
-  legacy-карточке.
-- Форумный раздел: `.unfurl-renderer` + `.forum-wrapper`; заголовок
-  подтягивается через `/forums/<slug>/`.
-- Медиа: `.embed-link`; market/account metadata — через
-  `POST https://api.lolz.team/editor/unfurl` с `basic post`-токеном.
+## Копирование
 
-## Copy
-
-`htmlToBbcode()` сохраняет:
-
-| DOM | BBCode |
-|---|---|
-| market/account card | `[UNFURL="href"]href[/UNFURL]` |
-| `.embed-link` | `[MEDIA=site]url[/MEDIA]` |
-| `a.LbTrigger img` | `[IMG]src[/IMG]` |
-| `a.mention` | `[USER=id]@nick[/USER]` |
-| `a.button.primary` | `[BUTTON=href]text[/BUTTON]` |
-| `[B]/[I]/[U]/[S]`, quote, spoiler, list, color/size | исходные теги |
-
-Копирование использует `message.raw`, если он есть, иначе —
-`htmlToBbcode(message.html)`. Тостов нет.
+`htmlToBbcode` сохраняет `[UNFURL]`, `[MEDIA]`, `[IMG]`, `[URL]`, `[USER]`,
+`[VIDEO]` и пользовательское форматирование, если оно уже есть в HTML.
+Новые сообщения с неподдерживаемым BBCode остаются plain-текстом.

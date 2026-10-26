@@ -5,7 +5,7 @@
 [CENTER][IMG=align=left;alt=%5BIMG%5D]https://nztcdn.com/files/cdbdaf88-5b3f-4546-bda2-cab4fb0d4c4d.webp[/IMG][IMG=align=left;alt=%5BIMG%5D]https://nztcdn.com/files/b5bf1aaf-f6b4-450e-9e34-2f0a1468b28d.webp[/IMG][/CENTER]
 
 [CENTER][SIZE=6][button=https://raw.githubusercontent.com/9sx77ssl/lzt-no-rules/main/extension/dist/no-rules.user.js] УСТАНОВИТЬ [/button][/SIZE]
-[SIZE=2][COLOR=#aaaaaa]Chrome / Edge / Firefox · Tampermonkey или Violentmonkey · 1.1.24[/COLOR][/SIZE][/CENTER]
+[SIZE=2][COLOR=#aaaaaa]Chrome / Edge / Firefox · Tampermonkey или Violentmonkey · 1.1.25[/COLOR][/SIZE][/CENTER]
 
 [SIZE=4][B]Что внутри[/B][/SIZE]
 [LIST]

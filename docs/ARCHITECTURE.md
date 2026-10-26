@@ -115,8 +115,8 @@ Tiptap при вставке ссылки создаёт нативные Svelte
 - `type=market_item` → legacy `.unfurlContainer.marketItem` с
   `categoryIcon`, `.title`, `.price > .Value`, `.LinkClicker`.
 
-BBCode (`[UNFURL]`, `[IMG]`, `[MEDIA]`, `[URL]`, `[B]`, ...) разбирается
-`resolveBbcode` до отправки и при рендере старых сообщений. Копирование
+BBCode в чате ограничен рабочими тегами: `[UNFURL]`, `[IMG]`, `[MEDIA]`,
+`[URL]`, `[VIDEO]`. Остальные теги снимаются в plain-текст. Копирование
 `htmlToBbcode()` возвращает BBCode, включая market-аккаунт.
 
 ## 5.2. Фото, смайлы, видео

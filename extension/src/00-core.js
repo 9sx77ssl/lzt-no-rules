@@ -1646,6 +1646,7 @@ function bbcodeMediaUrl(value, inner) {
 
 const BBCODE_RESTRICTED = new Set([
   'api',
+  'censor',
   'club',
   'days',
   'exceptids',
@@ -1657,14 +1658,25 @@ const BBCODE_RESTRICTED = new Set([
   'visitor',
 ]);
 
+const BBCODE_RENDER_TAGS = new Set(['img', 'media', 'unfurl', 'url', 'video']);
+
 function bbcodeElement(tag, value, inner) {
-  if (BBCODE_RESTRICTED.has(tag)) {
+  const name = String(tag || '').toLowerCase();
+  if (BBCODE_RESTRICTED.has(name)) {
     const el = document.createElement('span');
     el.className = 'muted';
     el.textContent = 'Скрытый контент форума недоступен';
     return el;
   }
-  switch (tag) {
+  if (!BBCODE_RENDER_TAGS.has(name)) {
+    if (name === 'plain' || name === 'code' || name === 'pre' || name === 'php' || name === 'html' || name === 'src') {
+      return document.createTextNode(String(inner || '').replace(/<br\s*\/?>/gi, '\n'));
+    }
+    if (name === 'hr') return document.createTextNode('\n');
+    const plain = String(inner || '').replace(/\[\*\]/gi, '\n');
+    return parseBbcodeFragment(plain);
+  }
+  switch (name) {
     case 'b':
     case 'strong': {
       const el = document.createElement('strong');

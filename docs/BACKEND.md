@@ -36,7 +36,7 @@ GET /health
 {
   "ok": true,
   "name": "no-rules-chat",
-  "version": "1.1.24",
+  "version": "1.1.25",
   "protocol": 1,
   "uptime": 123,
   "online": 2,
@@ -47,7 +47,7 @@ GET /health
 GET /version
 {
   "name": "no-rules-chat",
-  "version": "1.1.24",
+  "version": "1.1.25",
   "protocol": 1,
   "publicUrl": "wss://lztws.d9v.uk/ws"
 }
