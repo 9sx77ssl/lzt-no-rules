@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.7
+
+- Исправлен срочный Firefox-регресс: sandbox-функция больше не передаётся в
+  `editor.on('update')`, из-за чего ProseMirror падал с
+  `Permission denied to access property "apply"`.
+- `@inject-into page`; editor-команды и DOM-fallback обёрнуты в безопасные
+  try/catch. Отправка и очистка снова работают.
+- Сервер и extension: `1.3.7`.
+
 ## 1.3.6
 
 - Firefox/Tampermonkey: добавлен `@unwrap`, поиск Tiptap через

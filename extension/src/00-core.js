@@ -969,22 +969,20 @@ function getEditorElement() {
 function getTiptap() {
   const element = getEditorElement();
   if (!element) return null;
-  const candidates = [];
-  try { candidates.push(element.editor); } catch { /* Xray/expando */ }
-  try { candidates.push(element.wrappedJSObject?.editor); } catch { /* Xray/expando */ }
   try {
-    const pageDocument = PAGE_WINDOW?.document;
-    const pageElement = pageDocument?.querySelector('.chat2-footer .tiptap');
-    if (pageElement && pageElement !== element) candidates.push(pageElement.editor);
-  } catch { /* ignore */ }
-  return candidates.find((editor) => editor && typeof editor.getHTML === 'function') || null;
+    const editor = element.editor;
+    return editor && typeof editor.getHTML === 'function' ? editor : null;
+  } catch {
+    // Sandbox/Xray wrappers must not pass sandbox callbacks into ProseMirror.
+    return null;
+  }
 }
 
 function placeCaretAtEnd(element) {
   if (!element) return;
   try { element.focus({ preventScroll: true }); } catch { /* ignore */ }
   try {
-    const selection = PAGE_WINDOW?.getSelection?.() || window.getSelection?.();
+    const selection = window.getSelection?.() || PAGE_WINDOW?.getSelection?.();
     if (!selection) return;
     const range = document.createRange();
     range.selectNodeContents(element);
@@ -999,13 +997,17 @@ function placeCaretAtEnd(element) {
 
 function getEditorHtml() {
   const editor = getTiptap();
-  if (editor) return editor.getHTML();
+  if (editor) {
+    try { return editor.getHTML(); } catch { /* sandbox/Xray */ }
+  }
   return getEditorElement()?.innerHTML || '';
 }
 
 function getEditorText() {
   const editor = getTiptap();
-  if (editor) return editor.getText();
+  if (editor) {
+    try { return editor.getText(); } catch { /* sandbox/Xray */ }
+  }
   return getEditorElement()?.innerText || '';
 }
 
@@ -1058,38 +1060,45 @@ function clearEditor() {
   try {
     const editor = getTiptap();
     if (editor) {
-      clearTiptapContent(editor);
-      editor.commands.focus('end');
-      // Tiptap can leave NodeView DOM wrappers behind after clearing several
-      // media nodes. Clear once more on the next frame and drop any orphaned
-      // wrappers while the editor is still empty. The token makes this a no-op
-      // as soon as the user starts a new draft.
-      const cleanupClearedEditor = () => {
-        if (token !== state.clearEditorToken || !state.active) return;
-        const current = getTiptap();
-        const element = getEditorElement();
-        if (!current || !element) return;
-        if (current.getText().trim()) return;
-        const leftovers = element.querySelectorAll(
-          '.node-image, .node-smilie, .tiptap-media, .ProseMirror-gapcursor',
-        );
-        if (!leftovers.length) return;
-        const restoreGuard = state.limitRestoring;
-        state.limitRestoring = true;
-        try {
-          clearTiptapContent(current);
+      try {
+        clearTiptapContent(editor);
+        editor.commands.focus('end');
+        // Tiptap can leave NodeView DOM wrappers behind after clearing several
+        // media nodes. Clear once more on the next frame and drop any orphaned
+        // wrappers while the editor is still empty. The token makes this a no-op
+        // as soon as the user starts a new draft.
+        const cleanupClearedEditor = () => {
+          if (token !== state.clearEditorToken || !state.active) return;
+          const current = getTiptap();
+          const element = getEditorElement();
+          if (!current || !element) return;
+          let text = '';
+          try { text = current.getText(); } catch { /* sandbox/Xray */ }
+          if (text.trim()) return;
+          const leftovers = element.querySelectorAll(
+            '.node-image, .node-smilie, .tiptap-media, .ProseMirror-gapcursor',
+          );
+          if (!leftovers.length) return;
+          const restoreGuard = state.limitRestoring;
+          state.limitRestoring = true;
+          try {
+            clearTiptapContent(current);
+          } catch {
+            // Keep going: removing visible wrappers is the safety net.
+          }
           for (const node of leftovers) {
             if (node.isConnected) node.remove();
           }
-          current.commands.focus('end');
-        } finally {
+          try { current.commands.focus('end'); } catch { /* sandbox/Xray */ }
           state.limitRestoring = restoreGuard;
           syncEditorLimitState();
-        }
-      };
-      requestAnimationFrame(cleanupClearedEditor);
-      setTimeout(cleanupClearedEditor, 80);
-      return;
+        };
+        requestAnimationFrame(cleanupClearedEditor);
+        setTimeout(cleanupClearedEditor, 80);
+        return;
+      } catch {
+        // Fall through to the DOM clear below.
+      }
     }
     const element = getEditorElement();
     if (!element) return;
@@ -1109,10 +1118,14 @@ function setEditorHtml(html) {
   try {
     const editor = getTiptap();
     if (editor) {
-      editor.commands.setContent(html || '');
-      editor.commands.focus('end');
-      muteEditorVideos();
-      return;
+      try {
+        editor.commands.setContent(html || '');
+        editor.commands.focus('end');
+        muteEditorVideos();
+        return;
+      } catch {
+        // Fall through to the DOM setter below.
+      }
     }
     const element = getEditorElement();
     if (!element) return;
@@ -1129,8 +1142,12 @@ function setEditorHtml(html) {
 function insertEditorText(text) {
   const editor = getTiptap();
   if (editor) {
-    editor.chain().focus().insertContent(text).run();
-    return;
+    try {
+      editor.chain().focus().insertContent(text).run();
+      return;
+    } catch {
+      // Fall through to execCommand.
+    }
   }
   const element = getEditorElement();
   if (!element) return;

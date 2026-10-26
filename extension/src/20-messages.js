@@ -520,8 +520,12 @@ function startEdit(message) {
   setEditorHtml(message.html || '');
   renderEditBar();
   const editor = getTiptap();
-  if (editor) editor.commands.focus('end');
-  else placeCaretAtEnd(getEditorElement());
+  try {
+    if (editor) editor.commands.focus('end');
+    else placeCaretAtEnd(getEditorElement());
+  } catch {
+    placeCaretAtEnd(getEditorElement());
+  }
   document.querySelector('.chat2-footer')?.scrollIntoView({ block: 'end' });
 }
 
@@ -723,16 +727,6 @@ function editLastOwnMessage() {
 
 function editorLimitMessage() {
   return `Максимум ${MAX_MESSAGE_CHARS} символов.`;
-}
-
-function bindEditorLimit() {
-  const editor = getTiptap();
-  if (!editor || state.limitEditor === editor) return;
-  state.limitEditor = editor;
-  editor.on('update', () => {
-    if (!state.active || state.limitRestoring) return;
-    enforceEditorLimit();
-  });
 }
 
 function enforceEditorLimit() {

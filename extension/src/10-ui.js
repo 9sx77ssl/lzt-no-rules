@@ -1513,7 +1513,6 @@ function enforceActiveUI() {
   if (state.active) {
     ensureMessagesContainer();
     ensureRoomLink();
-    bindEditorLimit();
 
     const container = document.getElementById('no-rules-messages');
     hideNativeForRoom();

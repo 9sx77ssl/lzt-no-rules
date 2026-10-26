@@ -58,7 +58,6 @@ function activateRoom({ fromNotification = false } = {}) {
 
   ensureMessagesContainer();
   restoreNoRulesDraft();
-  bindEditorLimit();
   enforceActiveUI();
   renderMessages({ preserveScroll: restoreScroll, forceBottom: !restoreScroll });
   if (restoreScroll) {

@@ -11,6 +11,7 @@
 // @run-at       document-start
 // @grant        none
 // @unwrap
+// @inject-into page
 // @noframes
 // @homepageURL  https://lolz.team/gay1234
 // @supportURL   https://lolz.team/gay1234

@@ -42,7 +42,7 @@ GET /health
 {
   "ok": true,
   "name": "no-rules-chat",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "protocol": 1,
   "uptime": 123,
   "online": 2,
@@ -53,7 +53,7 @@ GET /health
 GET /version
 {
   "name": "no-rules-chat",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "protocol": 1,
   "publicUrl": "wss://lztws.d9v.uk/ws"
 }
@@ -66,7 +66,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 
 ## 3. Протокол
 
-Версия протокола: **1**. Клиент и сервер: **1.3.6**. Транспорт — WebSocket,
+Версия протокола: **1**. Клиент и сервер: **1.3.7**. Транспорт — WebSocket,
 текстовые кадры JSON.
 
 ### Подключение
@@ -75,7 +75,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 2. Сервер присылает `hello`:
 
 ```json
-{"type":"hello","protocol":1,"version":"1.3.6","roomTitle":"No Rules","serverTime":1792946496011}
+{"type":"hello","protocol":1,"version":"1.3.7","roomTitle":"No Rules","serverTime":1792946496011}
 ```
 
 3. Клиент отправляет `auth` (первый вход) или `resume` (есть сессия).
@@ -87,7 +87,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
   "type": "auth",
   "token": "<temporary forum JWT>",
   "accessKey": "<shared extension key>",
-  "clientVersion": "1.3.6"
+  "clientVersion": "1.3.7"
 }
 ```
 
@@ -121,7 +121,7 @@ WebSocket: `/ws` (и `/`). Handshake проверяет `Origin` по
 ### resume
 
 ```json
-{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.3.6"}
+{"type":"resume","session":"<session token>","accessKey":"...","clientVersion":"1.3.7"}
 ```
 
 Ответ такой же `auth.ok`; поле `resumed` есть только в логах сервера.
@@ -736,7 +736,7 @@ Playwright-сценарии лежат вне репозитория из-за `
 ### Сборка
 
 ```bash
-NR_VERSION=1.3.6 \
+NR_VERSION=1.3.7 \
 NR_WS_URL=wss://lztws.d9v.uk/ws \
 NR_ACCESS_KEY='<production key>' \
 node scripts/build-extension.mjs
@@ -944,8 +944,10 @@ production `.env` и реальные ID всё равно не должны п�
 
 Полный архив — [`CHANGELOG.md`](CHANGELOG.md). Ключевые вехи:
 
-- **1.3.6** — Firefox/Tampermonkey: `@unwrap` + `wrappedJSObject`-доступ к
-  Tiptap и DOM-каретка в конец; больше не зависит от sandbox.
+- **1.3.7** — убран опасный `editor.on`-callback из sandbox (Permission
+  denied apply); `@inject-into page` + безопасный DOM-fallback.
+- **1.3.6** — Firefox/Tampermonkey: `@unwrap`, доступ к Tiptap и DOM-каретка
+  в конец.
 - **1.3.5** — удаление осиротевших NodeView-обёрток после отправки, чтобы
   N-1 смайлов не оставались в composer-е.
 - **1.3.4** — редактор: нативные 32×32 превью смайлов, курсор в конце при
